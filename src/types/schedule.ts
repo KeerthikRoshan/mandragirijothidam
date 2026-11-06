@@ -1,0 +1,79 @@
+/**
+ * Schedule and Booking Type Definitions for Mandhragiri Jothidam
+ * Supports Daily Schedule, Weekly/Monthly calendar modes, time/priest layouts,
+ * status tracking, and date-blocking availability.
+ */
+
+export type CalendarMode = 'week' | 'month';
+
+export type ScheduleViewMode = 'time' | 'priest';
+
+export type BookingCategory = 'all' | 'jathagam' | 'temple' | 'outdoor';
+
+export type BookingStatus = 'confirmed' | 'upcoming' | 'pending' | 'completed' | 'cancelled';
+
+export interface ScheduleBooking {
+  id: string;
+  date: string; // YYYY-MM-DD
+  timeSlot: string; // e.g. "09:30 AM - 10:30 AM"
+  startTime: string; // "09:30 AM"
+  endTime: string; // "10:30 AM"
+  titleTamil: string; // e.g. "ஜாதக கணிப்பு & பலன் பார்த்தல்"
+  titleEnglish?: string; // "Jathagam Consultation"
+  category: BookingCategory;
+  categoryLabelTamil: string; // e.g. "ஜாதகம்"
+  status: BookingStatus;
+  statusLabelTamil: string; // e.g. "உறுதி செய்யப்பட்டது"
+  clientName: string; // e.g. "திரு. சுந்தரேசன் குடும்பத்தார்"
+  clientPhone: string; // e.g. "+91 98421 55678"
+  locationTamil: string; // e.g. "ஸ்ரீ மந்திரகிரி ஜோதிட பீடம்"
+  locationEnglish?: string;
+  priestId?: string;
+
+  priestNameTamil: string; // e.g. "சுவாமி சுந்தரமூர்த்தி குருக்கள்"
+  priestNameEnglish?: string;
+  priestPhone?: string;
+  notesTamil?: string;
+  amount?: string;
+  nakshatra?: string;
+  rasipalanSummary?: string;
+
+  // Payment Tracking Fields
+  totalEventCharge?: number; // நிகழ்வு மொத்தக் கட்டணம்
+  clientAdvanceAmount?: number; // Charge Advance: வாடிக்கையாளர் முன்பணம்
+  clientTotalReceived?: number; // Total Payment Received from Client: வாடிக்கையாளரிடமிருந்து பெறப்பட்ட மொத்தத் தொகை
+  clientBalanceAmount?: number; // Client Balance: Total Event Charge - Total Payment Received
+  priestTotalPay?: number; // Total Pay for Priest: புரோகிதருக்கு வழங்க வேண்டிய மொத்தத் தொகை
+  priestAdvancePaid?: number; // Advance Paid to Priest: புரோகிதருக்கு வழங்கிய முன்பணம்
+  priestBalanceAmount?: number; // Priest Balance: Total Pay for Priest - Advance Paid to Priest
+}
+
+
+export interface ScheduleBlock {
+  id: string;
+  date: string; // YYYY-MM-DD
+  isAllDay: boolean;
+  startTime?: string;
+  endTime?: string;
+  reasonTamil: string;
+  reasonEnglish?: string;
+  blockedBy?: string;
+}
+
+export interface DateBookingSummary {
+  date: string; // YYYY-MM-DD
+  total: number;
+  confirmed: number;
+  pending: number;
+  upcoming: number;
+  completed: number;
+  isBlocked: boolean;
+  isMuhurtham: boolean;
+}
+
+export interface CategoryFilterItem {
+  id: BookingCategory;
+  labelTamil: string;
+  labelEnglish: string;
+  count: number;
+}
