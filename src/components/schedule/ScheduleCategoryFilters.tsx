@@ -12,6 +12,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { BookingCategory } from '../../types/schedule';
 
 interface CategoryItem {
@@ -31,6 +32,9 @@ export const ScheduleCategoryFilters: React.FC<ScheduleCategoryFiltersProps> = (
   onSelectCategory,
   categories,
 }) => {
+  const { i18n } = useTranslation();
+  const isTa = (i18n.language || 'ta').startsWith('ta');
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -55,6 +59,7 @@ export const ScheduleCategoryFilters: React.FC<ScheduleCategoryFiltersProps> = (
               <Text
                 style={[
                   styles.chipText,
+                  isTa && styles.chipTextTamil,
                   isSelected ? styles.chipTextSelected : styles.chipTextNormal,
                 ]}
               >
@@ -101,6 +106,10 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  chipTextTamil: {
+    fontSize: 11.5,
+    fontWeight: '600',
   },
   chipTextNormal: {
     color: '#334155',

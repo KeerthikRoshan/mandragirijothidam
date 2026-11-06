@@ -28,6 +28,12 @@ export const ASSETS = {
       sundaram: require('../assets/images/priests/sundaram.png'),
       venkat: require('../assets/images/priests/venkat.png'),
     },
+    venue: {
+      home: require('../assets/images/venue/venue_home.png'),
+      temple: require('../assets/images/venue/venue_temple.png'),
+      hall: require('../assets/images/venue/venue_hall.png'),
+      other: require('../assets/images/venue/venue_other.png'),
+    },
   },
 } as const;
 

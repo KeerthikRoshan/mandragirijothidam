@@ -1,7 +1,8 @@
 /**
  * ScheduleHeader Component
- * Top app bar for Daily Schedule screen with title, English subtitle,
+ * Top app bar for Daily Schedule screen with title, subtitle,
  * back/home navigation, and calendar view switch button.
+ * Fine-tuned for consistent Tamil and English typography.
  */
 
 import React from 'react';
@@ -26,7 +27,8 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
   onPressBack,
   onToggleCalendarMode,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isTa = (i18n.language || 'ta').startsWith('ta');
 
   return (
     <View style={styles.headerContainer}>
@@ -43,8 +45,12 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
 
       {/* Center Title & Subtitle */}
       <View style={styles.titleContainer}>
-        <Text style={styles.tamilTitle}>{t('schedule.title')}</Text>
-        <Text style={styles.englishSubtitle}>{t('schedule.subtitle')}</Text>
+        <Text style={[styles.title, isTa && styles.titleTamil]}>
+          {t('schedule.title')}
+        </Text>
+        <Text style={[styles.subtitle, isTa && styles.subtitleTamil]}>
+          {t('schedule.subtitle')}
+        </Text>
       </View>
 
       {/* Right Mode Toggle button */}
@@ -69,7 +75,6 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
     </View>
   );
 };
-
 
 const styles = StyleSheet.create({
   headerContainer: {
@@ -106,16 +111,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tamilTitle: {
+  title: {
     fontSize: 18,
     fontWeight: '700',
     color: '#074735',
     letterSpacing: 0.3,
   },
-  englishSubtitle: {
+  titleTamil: {
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: 0.15,
+  },
+  subtitle: {
     fontSize: 12,
     fontWeight: '500',
     color: '#718096',
     marginTop: 1,
+  },
+  subtitleTamil: {
+    fontSize: 11.5,
+    fontWeight: '500',
   },
 });

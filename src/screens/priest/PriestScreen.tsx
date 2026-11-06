@@ -52,6 +52,7 @@ import { PriestScreenNavigationProp } from '../../types/navigation';
 import { ScheduleBooking } from '../../types/schedule';
 import { getPriestBookingCategories } from '../../utils/priestBookingSelectors';
 import { staffService } from '../../services/staffService';
+import { bookingApiService } from '../../services/bookingApiService';
 import { useTranslation } from 'react-i18next';
 
 export const PriestScreen: React.FC = () => {
@@ -74,24 +75,41 @@ export const PriestScreen: React.FC = () => {
   const [isRegistrationModalVisible, setIsRegistrationModalVisible] =
     useState<boolean>(false);
 
+  // Dynamic Priest Bookings fetched from backend API
+  const [dynamicPriestBookings, setDynamicPriestBookings] = useState<ScheduleBooking[]>([]);
+
+  const loadPriestBookings = useCallback(async (priestId: string) => {
+    try {
+      const list = await bookingApiService.getPriestBookings(priestId);
+      if (list && list.length > 0) {
+        setDynamicPriestBookings(list);
+      } else {
+        setDynamicPriestBookings([]);
+      }
+    } catch (err) {
+      console.warn('⚠️ [PriestScreen] Failed to load priest bookings from API:', err);
+    }
+  }, []);
+
   // Fetch staff directory from backend database API: GET /api/v1/staff
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
       const staff = await staffService.fetchStaff();
       setStaffList(staff);
-      setSelectedPriestId(prev => {
-        if (prev && staff.some(s => s.id === prev)) {
-          return prev;
-        }
-        return staff.length > 0 ? staff[0].id : null;
-      });
+      const targetPriestId = selectedPriestId && staff.some(s => s.id === selectedPriestId)
+        ? selectedPriestId
+        : (staff.length > 0 ? staff[0].id : null);
+      setSelectedPriestId(targetPriestId);
+      if (targetPriestId) {
+        await loadPriestBookings(targetPriestId);
+      }
     } catch (error) {
       console.warn('Failed to refresh staff from API:', error);
     } finally {
       setIsRefreshing(false);
     }
-  }, []);
+  }, [selectedPriestId, loadPriestBookings]);
 
   useEffect(() => {
     let isMounted = true;
@@ -101,12 +119,11 @@ export const PriestScreen: React.FC = () => {
         const staff = await staffService.fetchStaff();
         if (isMounted) {
           setStaffList(staff);
-          setSelectedPriestId(prev => {
-            if (prev && staff.some(s => s.id === prev)) {
-              return prev;
-            }
-            return staff.length > 0 ? staff[0].id : null;
-          });
+          const firstId = staff.length > 0 ? staff[0].id : null;
+          setSelectedPriestId(prev => (prev && staff.some(s => s.id === prev) ? prev : firstId));
+          if (firstId) {
+            loadPriestBookings(firstId);
+          }
         }
       } catch (error) {
         console.warn('Failed to fetch staff from API:', error);
@@ -135,18 +152,25 @@ export const PriestScreen: React.FC = () => {
       isMounted = false;
       unsubscribe();
     };
-  }, []);
-
-  // Dynamic active staff count calculated strictly from records where status === 'active'
-  const activeCount = useMemo(() => {
-    return staffList.filter(s => s.status === 'active').length;
-  }, [staffList]);
+  }, [loadPriestBookings]);
 
   // Dynamically resolve currently selected priest
   const selectedPriest: PriestStaffItem | null = useMemo(() => {
     if (staffList.length === 0) return null;
     return staffList.find(p => p.id === selectedPriestId) || staffList[0] || null;
   }, [staffList, selectedPriestId]);
+
+  // Load priest bookings whenever active priest selection changes
+  useEffect(() => {
+    if (selectedPriest?.id) {
+      loadPriestBookings(selectedPriest.id);
+    }
+  }, [selectedPriest?.id, loadPriestBookings]);
+
+  // Dynamic active staff count calculated strictly from records where status === 'active'
+  const activeCount = useMemo(() => {
+    return staffList.filter(s => s.status === 'active').length;
+  }, [staffList]);
 
   // Filter priests by search query
   const filteredStaff = useMemo(() => {
@@ -163,7 +187,14 @@ export const PriestScreen: React.FC = () => {
     );
   }, [staffList, searchQuery]);
 
-  // Synchronized bookings and statistics calculated via selector utility (Reference Date: 2026-10-16)
+  // Synchronized bookings and statistics calculated via selector utility
+  const priestBookings = useMemo(() => {
+    if (dynamicPriestBookings.length > 0) {
+      return dynamicPriestBookings;
+    }
+    return selectedPriest?.bookings || [];
+  }, [dynamicPriestBookings, selectedPriest?.bookings]);
+
   const bookingCategories = useMemo(() => {
     if (!selectedPriest) {
       return {
@@ -183,8 +214,8 @@ export const PriestScreen: React.FC = () => {
         },
       };
     }
-    return getPriestBookingCategories(selectedPriest.bookings || [], '2026-10-16');
-  }, [selectedPriest]);
+    return getPriestBookingCategories(priestBookings, '2026-10-16');
+  }, [selectedPriest, priestBookings]);
 
   // Bookings to display under current tab — guaranteed to match tab count exactly
   const currentTabBookings: ScheduleBooking[] = useMemo(() => {
@@ -203,12 +234,65 @@ export const PriestScreen: React.FC = () => {
     setIsAddPriestModalVisible(false);
   };
 
-  const handleCreateBooking = (formData: NewBookingFormData) => {
-    setIsRegistrationModalVisible(false);
-    Alert.alert(
-      'பூஜை பதிவு வெற்றிகரமாக சேர்க்கப்பட்டது',
-      `${formData.title} (${formData.timeSlot})\nபக்தர்: ${formData.clientName}\nபுரோகிதர்: ${formData.priestName}`
-    );
+  const handleCreateBooking = async (formData: NewBookingFormData) => {
+    try {
+      const startTime = formData.timeSlot.split('-')[0].trim();
+      const targetPriestId = formData.priestId || (selectedPriest ? selectedPriest.id : undefined);
+      const payload = {
+        dateKey: formData.dateKey,
+        booking_date: formData.dateKey,
+        date: formData.dateKey,
+        title: formData.title,
+        clientName: formData.clientName,
+        client_name: formData.clientName,
+        phone: formData.phone,
+        client_phone: formData.phone,
+        alternatePhone: formData.alternatePhone || null,
+        alternate_phone: formData.alternatePhone || null,
+        startTime: startTime,
+        start_time: startTime,
+        durationMinutes: formData.durationMinutes,
+        duration_minutes: formData.durationMinutes,
+        timeSlot: formData.timeSlot,
+        venueType: formData.venueType,
+        venue_type: formData.venueType,
+        location: formData.location,
+        address: formData.address || null,
+        area: formData.area || null,
+        pincode: formData.pincode || null,
+        samagriBy: formData.samagriBy,
+        samagri_by: formData.samagriBy,
+        notes: formData.notes || null,
+        priestId: targetPriestId,
+        priest_id: targetPriestId,
+        priestIds: targetPriestId ? [targetPriestId] : [],
+        priest_ids: targetPriestId ? [targetPriestId] : [],
+        category: formData.category || 'outdoor',
+        category_label_tamil: formData.categoryLabelTamil,
+        totalEventCharge: formData.totalEventCharge,
+        total_event_charge: formData.totalEventCharge,
+        clientAdvanceAmount: formData.clientAdvanceAmount,
+        client_advance_amount: formData.clientAdvanceAmount,
+        clientTotalReceived: formData.clientTotalReceived,
+        client_total_received: formData.clientTotalReceived,
+        priestTotalPay: formData.priestTotalPay,
+        priest_total_pay: formData.priestTotalPay,
+        priestAdvancePaid: formData.priestAdvancePaid,
+        priest_advance_paid: formData.priestAdvancePaid,
+      };
+
+      const newBooking = await bookingApiService.createBooking(payload);
+      setIsRegistrationModalVisible(false);
+      if (selectedPriest?.id) {
+        await loadPriestBookings(selectedPriest.id);
+      }
+      Alert.alert(
+        'பூஜை பதிவு வெற்றிகரமாக சேர்க்கப்பட்டது',
+        `${newBooking.titleTamil || newBooking.titleEnglish} (${formData.timeSlot})\nபக்தர்: ${formData.clientName}\nபுரோகிதர்: ${formData.priestName}`
+      );
+    } catch (err: any) {
+      Alert.alert('பதிவு பிழை', err?.message || 'பூஜை பதிவை சேர்க்க முடியவில்லை');
+    }
   };
 
   // Safe area metrics for responsive bottom positioning

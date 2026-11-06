@@ -23,7 +23,8 @@ export const ScheduleViewToggle: React.FC<ScheduleViewToggleProps> = ({
   viewMode,
   onSelectViewMode,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isTa = (i18n.language || 'ta').startsWith('ta');
 
   return (
     <View style={styles.container}>
@@ -49,6 +50,7 @@ export const ScheduleViewToggle: React.FC<ScheduleViewToggleProps> = ({
           minimumFontScale={0.85}
           style={[
             styles.tabText,
+            isTa && styles.tabTextTamil,
             viewMode === 'time' && styles.tabTextActive,
           ]}
         >
@@ -78,6 +80,7 @@ export const ScheduleViewToggle: React.FC<ScheduleViewToggleProps> = ({
           minimumFontScale={0.85}
           style={[
             styles.tabText,
+            isTa && styles.tabTextTamil,
             viewMode === 'priest' && styles.tabTextActive,
           ]}
         >
@@ -130,6 +133,11 @@ const styles = StyleSheet.create({
     color: '#4B5563',
     textAlign: 'center',
     includeFontPadding: false,
+  },
+
+  tabTextTamil: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 
   tabTextActive: {

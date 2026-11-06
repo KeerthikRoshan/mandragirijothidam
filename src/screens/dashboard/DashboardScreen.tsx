@@ -13,7 +13,7 @@
  * 7. Bottom Navigation (முகப்பு, நாள்வாரி, புரோகிதர், profile)
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -39,8 +39,31 @@ import {
 } from '../../components/dashboard/DashboardBottomNav';
 import { DASHBOARD_MOCK_DATA } from '../../data/dashboardMockData';
 import { EventBookingItem, OverviewStatItem } from '../../types/dashboard';
+import { ScheduleBooking } from '../../types/schedule';
 import { DashboardScreenNavigationProp } from '../../types/navigation';
+import { formatDateKey } from '../../utils/dateUtils';
+import { bookingApiService } from '../../services/bookingApiService';
 import { useTranslation } from 'react-i18next';
+
+function mapScheduleBookingToEventBookingItem(booking: ScheduleBooking): EventBookingItem {
+  const isJathagam = booking.category === 'jathagam';
+  return {
+    id: booking.id,
+    timeRange: booking.timeSlot,
+    category: booking.categoryLabelTamil || (isJathagam ? 'ஜாதகம்' : 'நிகழ்வு'),
+    categoryBg: isJathagam ? '#EFF6FF' : '#FEF3C7',
+    categoryTextColor: isJathagam ? '#1D4ED8' : '#92400E',
+    iconType: isJathagam ? 'book' : 'heart',
+    iconBg: isJathagam ? '#DBEAFE' : '#FDE68A',
+    iconColor: isJathagam ? '#1E40AF' : '#B45309',
+    titleTamil: booking.titleTamil,
+    titleEnglish: booking.titleEnglish || '',
+    customerName: booking.clientName,
+    adminOrPriestInfo: booking.priestNameTamil || 'சுவாமி',
+    location: booking.locationTamil,
+    status: booking.statusLabelTamil || 'உறுதியானது',
+  };
+}
 
 export const DashboardScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -49,6 +72,38 @@ export const DashboardScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<DashboardTabId>('home');
   const [isRegistrationModalVisible, setIsRegistrationModalVisible] =
     useState<boolean>(false);
+
+  const todayKey = useMemo(() => formatDateKey(new Date()), []);
+  const [todayBookings, setTodayBookings] = useState<EventBookingItem[]>(DASHBOARD_MOCK_DATA.todayEvents.bookings);
+  const [todayCount, setTodayCount] = useState<number>(DASHBOARD_MOCK_DATA.todayEvents.count);
+
+  const loadTodayBookings = useCallback(async () => {
+    try {
+      const list = await bookingApiService.getBookingsByDate(todayKey);
+      if (list && list.length > 0) {
+        setTodayBookings(list.map(mapScheduleBookingToEventBookingItem));
+        setTodayCount(list.length);
+      }
+    } catch (err) {
+      console.warn('⚠️ [DashboardScreen] Failed to load today bookings:', err);
+    }
+  }, [todayKey]);
+
+  useEffect(() => {
+    loadTodayBookings();
+  }, [loadTodayBookings]);
+
+  const dynamicStats: OverviewStatItem[] = useMemo(() => {
+    return DASHBOARD_MOCK_DATA.overview.stats.map(stat => {
+      if (stat.id === '1') {
+        return {
+          ...stat,
+          value: String(todayCount),
+        };
+      }
+      return stat;
+    });
+  }, [todayCount]);
 
   const handleNotificationsPress = () => {
     Alert.alert(
@@ -98,18 +153,69 @@ export const DashboardScreen: React.FC = () => {
     setIsRegistrationModalVisible(true);
   };
 
-  const handleRegistrationSubmit = (payload: NewBookingFormData) => {
-    Alert.alert(
-      t('dashboard.bookingSuccessTitle'),
-      `${payload.title} (${payload.timeSlot})\n${t('common.client')}: ${payload.clientName}\n${t('common.location')}: ${payload.location}\n${t('common.priest')}: ${payload.priestName}`,
-      [
-        {
-          text: t('dashboard.viewScheduleBtn'),
-          onPress: () => navigation?.navigate('DailySchedule'),
-        },
-        { text: t('common.ok') },
-      ],
-    );
+  const handleRegistrationSubmit = async (formData: NewBookingFormData) => {
+    try {
+      const startTime = formData.timeSlot.split('-')[0].trim();
+      const payload = {
+        dateKey: formData.dateKey,
+        booking_date: formData.dateKey,
+        date: formData.dateKey,
+        title: formData.title,
+        clientName: formData.clientName,
+        client_name: formData.clientName,
+        phone: formData.phone,
+        client_phone: formData.phone,
+        alternatePhone: formData.alternatePhone || null,
+        alternate_phone: formData.alternatePhone || null,
+        startTime: startTime,
+        start_time: startTime,
+        durationMinutes: formData.durationMinutes,
+        duration_minutes: formData.durationMinutes,
+        timeSlot: formData.timeSlot,
+        venueType: formData.venueType,
+        venue_type: formData.venueType,
+        location: formData.location,
+        address: formData.address || null,
+        area: formData.area || null,
+        pincode: formData.pincode || null,
+        samagriBy: formData.samagriBy,
+        samagri_by: formData.samagriBy,
+        notes: formData.notes || null,
+        priestId: formData.priestId,
+        priest_id: formData.priestId,
+        priestIds: formData.priestId ? [formData.priestId] : [],
+        priest_ids: formData.priestId ? [formData.priestId] : [],
+        category: formData.category || 'outdoor',
+        category_label_tamil: formData.categoryLabelTamil,
+        totalEventCharge: formData.totalEventCharge,
+        total_event_charge: formData.totalEventCharge,
+        clientAdvanceAmount: formData.clientAdvanceAmount,
+        client_advance_amount: formData.clientAdvanceAmount,
+        clientTotalReceived: formData.clientTotalReceived,
+        client_total_received: formData.clientTotalReceived,
+        priestTotalPay: formData.priestTotalPay,
+        priest_total_pay: formData.priestTotalPay,
+        priestAdvancePaid: formData.priestAdvancePaid,
+        priest_advance_paid: formData.priestAdvancePaid,
+      };
+
+      const newBooking = await bookingApiService.createBooking(payload);
+      setIsRegistrationModalVisible(false);
+      loadTodayBookings();
+      Alert.alert(
+        t('dashboard.bookingSuccessTitle'),
+        `${newBooking.titleTamil || newBooking.titleEnglish} (${formData.timeSlot})\n${t('common.client')}: ${formData.clientName}\n${t('common.location')}: ${formData.location}\n${t('common.priest')}: ${formData.priestName}`,
+        [
+          {
+            text: t('dashboard.viewScheduleBtn'),
+            onPress: () => navigation?.navigate('DailySchedule'),
+          },
+          { text: t('common.ok') },
+        ],
+      );
+    } catch (err: any) {
+      Alert.alert('பதிவு பிழை', err?.message || 'பூஜை பதிவை சேர்க்க முடியவில்லை');
+    }
   };
 
   // Safe area metrics for responsive bottom positioning
@@ -157,7 +263,7 @@ export const DashboardScreen: React.FC = () => {
         <OverviewSection
           title={t('dashboard.overviewTitle')}
           actionText={t('dashboard.statsReports')}
-          stats={DASHBOARD_MOCK_DATA.overview.stats}
+          stats={dynamicStats}
           onPressReports={handleReportsPress}
           onPressStat={handleStatPress}
         />
@@ -165,10 +271,10 @@ export const DashboardScreen: React.FC = () => {
         {/* SECTION 5: Today's Events */}
         <TodayEventsSection
           title={t('dashboard.todayEventsTitle')}
-          count={DASHBOARD_MOCK_DATA.todayEvents.count}
+          count={todayCount}
           actionText={t('common.viewAll')}
           liveOperation={DASHBOARD_MOCK_DATA.todayEvents.liveOperation}
-          bookings={DASHBOARD_MOCK_DATA.todayEvents.bookings}
+          bookings={todayBookings}
           onPressViewAll={handleViewAllEvents}
           onPressLiveOperation={handleLiveOperationPress}
           onPressBooking={handleBookingPress}

@@ -2,7 +2,8 @@
  * DateSummary Component
  * Summary card for the selected date displaying Gregorian date,
  * Tamil year + month + day + weekday, and dynamic booking stat pills
- * (மொத்தம், உறுதி, நிலுவை), plus a "தற்போதைய வாரம்" shortcut in monthly mode.
+ * (மொத்தம், உறுதி, நிலுவை).
+ * Refined for balanced Tamil and English typography.
  */
 
 import React from 'react';
@@ -14,13 +15,13 @@ import {
 import { useTranslation } from 'react-i18next';
 import { DateBookingSummary, CalendarMode } from '../../types/schedule';
 import { TamilDateInfo } from '../../types/tamilCalendar';
-import { formatTamilDisplayDate } from '../../utils/dateUtils';
+import { formatDisplayDate } from '../../utils/dateUtils';
 
 interface DateSummaryProps {
   selectedDate: string; // YYYY-MM-DD
   tamilInfo: TamilDateInfo;
   summary: DateBookingSummary;
-  calendarMode: CalendarMode;
+  calendarMode?: CalendarMode;
   onSwitchToWeekly?: () => void;
 }
 
@@ -28,43 +29,56 @@ export const DateSummary: React.FC<DateSummaryProps> = ({
   selectedDate,
   tamilInfo,
   summary,
-  calendarMode: _calendarMode,
-  onSwitchToWeekly: _onSwitchToWeekly,
 }) => {
-  const { t } = useTranslation();
-  const displayDate = formatTamilDisplayDate(selectedDate);
-  const tamilDateString = `${tamilInfo.tamilYearName} வருடம் - ${tamilInfo.tamilMonth} ${tamilInfo.tamilDay} • ${tamilInfo.tamilWeekdayFull}`;
+  const { t, i18n } = useTranslation();
+  const isTa = (i18n.language || 'ta').startsWith('ta');
+
+  const displayDate = formatDisplayDate(selectedDate, isTa ? 'ta' : 'en');
+  const tamilDateString = isTa
+    ? `${tamilInfo.tamilYearName} வருடம் - ${tamilInfo.tamilMonth} ${tamilInfo.tamilDay} • ${tamilInfo.tamilWeekdayFull}`
+    : `${tamilInfo.tamilYearName} Year - ${tamilInfo.tamilMonth} ${tamilInfo.tamilDay} • ${tamilInfo.tamilWeekdayFull}`;
 
   return (
     <View style={styles.cardContainer}>
       <View style={styles.topRow}>
         {/* Date Titles */}
         <View style={styles.dateInfoContainer}>
-          <Text style={styles.gregorianDateText}>{displayDate}</Text>
-          <Text style={styles.tamilDateText}>{tamilDateString}</Text>
+          <Text style={[styles.gregorianDateText, isTa && styles.gregorianDateTextTamil]}>
+            {displayDate}
+          </Text>
+          <Text style={[styles.tamilDateText, isTa && styles.tamilDateTextTamil]}>
+            {tamilDateString}
+          </Text>
         </View>
-       
       </View>
 
       {/* Booking Stat Pills (மொத்தம் / உறுதி / நிலுவை) */}
       <View style={styles.pillsRow}>
         <View style={[styles.pill, styles.pillTotal]}>
-          <Text style={styles.pillTextTotal}>{t('schedule.summaryTotal')}: {summary.total}</Text>
+          <Text style={[styles.pillTextTotal, isTa && styles.pillTextTamil]}>
+            {t('schedule.summaryTotal')}: {summary.total}
+          </Text>
         </View>
 
         <View style={[styles.pill, styles.pillConfirmed]}>
           <View style={styles.confirmedDot} />
-          <Text style={styles.pillTextConfirmed}>{t('schedule.summaryConfirmed')}: {summary.confirmed}</Text>
+          <Text style={[styles.pillTextConfirmed, isTa && styles.pillTextTamil]}>
+            {t('schedule.summaryConfirmed')}: {summary.confirmed}
+          </Text>
         </View>
 
         <View style={[styles.pill, styles.pillPending]}>
           <View style={styles.pendingDot} />
-          <Text style={styles.pillTextPending}>{t('schedule.summaryPending')}: {summary.pending}</Text>
+          <Text style={[styles.pillTextPending, isTa && styles.pillTextTamil]}>
+            {t('schedule.summaryPending')}: {summary.pending}
+          </Text>
         </View>
 
         {summary.isMuhurtham && (
           <View style={[styles.pill, styles.pillMuhurtham]}>
-            <Text style={styles.pillTextMuhurtham}>{t('schedule.muhurthamBadge')}</Text>
+            <Text style={[styles.pillTextMuhurtham, isTa && styles.pillTextTamil]}>
+              {t('schedule.muhurthamBadge')}
+            </Text>
           </View>
         )}
       </View>
@@ -76,11 +90,11 @@ const styles = StyleSheet.create({
   cardContainer: {
     backgroundColor: '#F9F6EE', // Warm sandalwood cream
     marginHorizontal: 16,
-    marginVertical: 8,
+    marginVertical: 6,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#E8DFC8',
-    padding: 14,
+    padding: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
@@ -91,7 +105,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   dateInfoContainer: {
     flex: 1,
@@ -102,37 +116,32 @@ const styles = StyleSheet.create({
     color: '#074735', // Deep Forest Green
     letterSpacing: 0.2,
   },
+  gregorianDateTextTamil: {
+    fontSize: 13.5,
+    fontWeight: '800',
+  },
   tamilDateText: {
     fontSize: 11,
     fontWeight: '600',
     color: '#7A5408', // Warm brown/gold
-    marginTop: 3,
+    marginTop: 2,
   },
-  weekShortcutButton: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#C5A869',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginLeft: 8,
-  },
-  weekShortcutText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#074735',
+  tamilDateTextTamil: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    lineHeight: 15,
   },
   pillsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
   },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4.5,
     borderRadius: 8,
   },
   pillTotal: {
@@ -141,14 +150,14 @@ const styles = StyleSheet.create({
     borderColor: '#CBD5E1',
   },
   pillTextTotal: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
     color: '#334155',
   },
   pillConfirmed: {
     backgroundColor: '#E5F7EE',
     borderWidth: 1,
-    borderColor: '#B0ECC9',
+    borderColor: '#A7F3D0',
   },
   confirmedDot: {
     width: 6,
@@ -158,12 +167,12 @@ const styles = StyleSheet.create({
     marginRight: 5,
   },
   pillTextConfirmed: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
     color: '#065F46',
   },
   pillPending: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#FFF9E6',
     borderWidth: 1,
     borderColor: '#FDE68A',
   },
@@ -175,18 +184,22 @@ const styles = StyleSheet.create({
     marginRight: 5,
   },
   pillTextPending: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
     color: '#92400E',
   },
   pillMuhurtham: {
-    backgroundColor: '#FFF0CD',
+    backgroundColor: '#FEF3C7',
     borderWidth: 1,
-    borderColor: '#E2C785',
+    borderColor: '#F59E0B',
   },
   pillTextMuhurtham: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#8C5D07',
+    color: '#B45309',
+  },
+  pillTextTamil: {
+    fontSize: 10.5,
+    fontWeight: '700',
   },
 });

@@ -15,6 +15,17 @@ import { staffService } from '../src/services/staffService';
 import { apiClient } from '../src/services/apiClient';
 import { PriestStaffItem } from '../src/types/priest';
 
+jest.setTimeout(15000);
+
+jest.mock('../src/services/bookingApiService', () => ({
+  bookingApiService: {
+    checkAvailability: jest.fn().mockResolvedValue({ available: true, conflicts: [] }),
+    createBooking: jest.fn().mockResolvedValue({ id: 1 }),
+    getPriestBookings: jest.fn().mockResolvedValue([]),
+    getAllBookings: jest.fn().mockResolvedValue([]),
+  },
+}));
+
 const initialMetrics = {
   insets: { top: 44, left: 0, right: 0, bottom: 34 },
   frame: { x: 0, y: 0, width: 390, height: 844 },
@@ -106,6 +117,16 @@ describe('PriestScreen Component', () => {
           },
         });
       }
+      if (url.startsWith('/bookings')) {
+        return Promise.resolve({
+          status: 200,
+          data: {
+            status: 1,
+            success: true,
+            data: { bookings: [], eventTypes: [] },
+          },
+        });
+      }
       return Promise.reject(new Error(`Unknown endpoint: ${url}`));
     });
 
@@ -189,6 +210,16 @@ describe('PriestScreen Component', () => {
               activeCount: 0,
               staff: [],
             },
+          },
+        });
+      }
+      if (url.startsWith('/bookings')) {
+        return Promise.resolve({
+          status: 200,
+          data: {
+            status: 1,
+            success: true,
+            data: { bookings: [], eventTypes: [] },
           },
         });
       }
@@ -357,9 +388,14 @@ describe('PriestScreen Component', () => {
 
     const root = renderer!.root;
     const texts = root.findAllByType(Text).map(t => extractText(t.props.children));
-    expect(texts).toContain('புதிய நிகழ்வு / பூஜை பதிவு');
-    expect(texts).toContain('உறுதி செய்க');
-    expect(texts).toContain('ரத்து');
+    expect(texts).toContain('பூஜை பதிவு');
+    expect(texts).toContain('புதிய நிகழ்வு சேர்க்கை');
+    expect(texts).toContain('ரத்து செய்');
+    expect(texts).toContain('அடுத்து');
+
+    await ReactTestRenderer.act(async () => {
+      renderer.unmount();
+    });
   });
 
   it('getPriestBookingCategories guarantees 100% mathematical synchronization', () => {

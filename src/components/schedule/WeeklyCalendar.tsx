@@ -1,17 +1,18 @@
 /**
  * WeeklyCalendar Component
  * Weekly horizontal date selector for Daily Schedule screen.
- * Shows 7 consecutive dates with Tamil weekday, Gregorian date,
+ * Shows 7 consecutive dates with Tamil/English weekday, Gregorian date,
  * booking counts, selected state (forest green + gold border),
- * and "முழு மாதம் ›" expand link.
+ * and automatic centering of the active/today date.
  */
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -25,44 +26,48 @@ import {
 import { getTamilDateInfo } from '../../services/tamilCalendarService';
 import { ScheduleBooking } from '../../types/schedule';
 
+const ENGLISH_WEEKDAY_ABBREVIATIONS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
 interface WeeklyCalendarProps {
   selectedDate: string; // YYYY-MM-DD
   onSelectDate: (dateKey: string) => void;
-  onExpandToMonth: () => void;
+  onExpandToMonth?: () => void;
   bookings: ScheduleBooking[];
 }
 
 export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
   selectedDate,
   onSelectDate,
-  onExpandToMonth,
   bookings,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isTa = (i18n.language || 'ta').startsWith('ta');
+  const { width: screenWidth } = useWindowDimensions();
+  const scrollViewRef = useRef<ScrollView>(null);
+
   const selectedDateObj = parseDateKey(selectedDate);
   const weekDates = getWeekDates(selectedDateObj, true);
-
 
   // Helper to count bookings on a specific date
   const getBookingCount = (dateKey: string) => {
     return bookings.filter(b => b.date === dateKey).length;
   };
 
+  // Center the selected date in view
+  useEffect(() => {
+    const selectedIndex = weekDates.findIndex(d => isSameDay(d, selectedDateObj));
+    if (selectedIndex >= 0 && scrollViewRef.current) {
+      const cardWidthWithGap = 76; // 68 width + 8 gap
+      const offset = Math.max(0, selectedIndex * cardWidthWithGap - (screenWidth - 68) / 2 + 12);
+      scrollViewRef.current.scrollTo({ x: offset, animated: true });
+    }
+  }, [selectedDate, screenWidth, selectedDateObj, weekDates]);
+
   return (
     <View style={styles.container}>
-      {/* Top Context Bar: Month & Expand Link */}
-      <View style={styles.contextBar}>
-        <Pressable
-          onPress={onExpandToMonth}
-          style={styles.expandButton}
-          accessibilityRole="button"
-          accessibilityLabel={t('schedule.fullMonthLink') || 'முழு மாதம் ›'}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-       />
-      </View>
-
       {/* 7-Day Horizontal Strip */}
       <ScrollView
+        ref={scrollViewRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -70,8 +75,11 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
         {weekDates.map(dateObj => {
           const dateKey = formatDateKey(dateObj);
           const isSelected = isSameDay(dateObj, selectedDateObj);
+          const isToday = isSameDay(dateObj, new Date());
           const dayOfWeek = dateObj.getDay();
-          const weekdayAbbrev = TAMIL_WEEKDAY_ABBREVIATIONS[dayOfWeek];
+          const weekdayAbbrev = isTa
+            ? TAMIL_WEEKDAY_ABBREVIATIONS[dayOfWeek]
+            : ENGLISH_WEEKDAY_ABBREVIATIONS[dayOfWeek];
           const dayNumber = dateObj.getDate();
           const count = getBookingCount(dateKey);
           const tamilInfo = getTamilDateInfo(dateKey);
@@ -82,10 +90,16 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
               onPress={() => onSelectDate(dateKey)}
               style={[
                 styles.dayCard,
-                isSelected ? styles.dayCardSelected : styles.dayCardNormal,
+                isSelected
+                  ? styles.dayCardSelected
+                  : isToday
+                  ? styles.dayCardToday
+                  : styles.dayCardNormal,
               ]}
               accessibilityRole="button"
-              accessibilityLabel={`${weekdayAbbrev} ${dayNumber}, ${count} முன்பதிவுகள்`}
+              accessibilityLabel={`${weekdayAbbrev} ${dayNumber}, ${count} ${
+                isTa ? 'முன்பதிவுகள்' : 'bookings'
+              }${isToday ? ' (Today)' : ''}`}
               accessibilityState={{ selected: isSelected }}
             >
               {/* Star for Muhurtham date */}
@@ -100,12 +114,14 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                 </Text>
               )}
 
-              {/* Tamil Weekday */}
+              {/* Weekday Text (Tamil / English) */}
               <Text
                 style={[
                   styles.weekdayText,
+                  isTa && styles.weekdayTextTamil,
                   isSelected && styles.weekdayTextSelected,
                 ]}
+                numberOfLines={1}
               >
                 {weekdayAbbrev}
               </Text>
@@ -115,6 +131,7 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                 style={[
                   styles.dayNumberText,
                   isSelected && styles.dayNumberTextSelected,
+                  !isSelected && isToday && styles.dayNumberTextToday,
                 ]}
               >
                 {dayNumber}
@@ -130,13 +147,21 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                 <Text
                   style={[
                     styles.countText,
+                    isTa && styles.countTextTamil,
                     isSelected ? styles.countTextSelected : styles.countTextNormal,
                   ]}
                   numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
                 >
-                  {count} முன்பதிவு
+                  {isTa
+                    ? `${count} முன்பதிவு`
+                    : `${count} ${count === 1 ? 'event' : 'events'}`}
                 </Text>
               </View>
+
+              {/* Subtle indicator dot for Today when another date is selected */}
+              {isToday && !isSelected && <View style={styles.todayIndicatorDot} />}
             </Pressable>
           );
         })}
@@ -148,39 +173,11 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#FAF9F6',
-    paddingVertical: 12,
-  },
-  contextBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 10,
-  },
-  contextLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  contextCalendarIcon: {
-    fontSize: 13,
-    marginRight: 6,
-  },
-  contextTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#074735',
-  },
-  expandButton: {
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-  },
-  expandButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#A47A24', // Gold
+    paddingTop: 10,
+    paddingBottom: 6,
   },
   scrollContent: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     gap: 8,
   },
   dayCard: {
@@ -200,6 +197,16 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  dayCardToday: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#074735',
+    shadowColor: '#074735',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
     shadowRadius: 2,
     elevation: 1,
   },
@@ -228,12 +235,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#4B5563',
   },
+  weekdayTextTamil: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
   weekdayTextSelected: {
     color: '#E5E7EB',
   },
   dayNumberText: {
     fontSize: 18,
     fontWeight: '800',
+    color: '#074735',
+  },
+  dayNumberTextToday: {
     color: '#074735',
   },
   dayNumberTextSelected: {
@@ -245,6 +259,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     width: '94%',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   countBadgeNormal: {
     backgroundColor: '#F1F5F9',
@@ -256,10 +271,22 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '700',
   },
+  countTextTamil: {
+    fontSize: 8.5,
+    fontWeight: '700',
+  },
   countTextNormal: {
     color: '#64748B',
   },
   countTextSelected: {
     color: '#7A5408', // Dark gold text
+  },
+  todayIndicatorDot: {
+    position: 'absolute',
+    bottom: -3,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#074735',
   },
 });

@@ -1,7 +1,8 @@
 /**
- * BookingTimeline Component
- * Vertical timeline with status-colored nodes, connecting dotted lines,
- * and cards. Also supports grouping by priest when viewMode === 'priest'.
+ * BookingTimeline Component (Clean Booking List)
+ * Displays booking cards for the selected date in a simple, easy-to-scan layout
+ * without stepper or progress indicators.
+ * Supports Time Order and By Priest view modes.
  */
 
 import React from 'react';
@@ -13,7 +14,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { BookingCard } from './BookingCard';
-import { ScheduleBooking, ScheduleViewMode, BookingStatus } from '../../types/schedule';
+import { ScheduleBooking, ScheduleViewMode } from '../../types/schedule';
 import { ASSETS } from '../../constants/assets';
 
 interface BookingTimelineProps {
@@ -27,7 +28,8 @@ export const BookingTimeline: React.FC<BookingTimelineProps> = ({
   viewMode,
   onSelectBooking,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isTa = (i18n.language || 'ta').startsWith('ta');
 
   if (bookings.length === 0) {
     return (
@@ -39,35 +41,23 @@ export const BookingTimeline: React.FC<BookingTimelineProps> = ({
           accessible
           accessibilityLabel={t('schedule.emptyTitle')}
         />
-        <Text style={styles.emptyTitle}>{t('schedule.emptyTitle')}</Text>
-        <Text style={styles.emptySubtitle}>
+        <Text style={[styles.emptyTitle, isTa && styles.emptyTitleTamil]}>
+          {t('schedule.emptyTitle')}
+        </Text>
+        <Text style={[styles.emptySubtitle, isTa && styles.emptySubtitleTamil]}>
           {t('schedule.emptySubtitle')}
         </Text>
       </View>
     );
   }
 
-  // Node dot color based on booking status
-  const getNodeColor = (status: BookingStatus) => {
-    switch (status) {
-      case 'confirmed':
-        return '#059669'; // Green
-      case 'upcoming':
-        return '#EA580C'; // Orange
-      case 'pending':
-        return '#D97706'; // Amber/Yellow
-      case 'completed':
-        return '#64748B'; // Slate
-      default:
-        return '#074735';
-    }
-  };
-
-  // If in 'priest' mode, group bookings by priestNameTamil
+  // If in 'priest' mode, group bookings by priestNameTamil / priestName
   if (viewMode === 'priest') {
     const priestGroups: Record<string, ScheduleBooking[]> = {};
     bookings.forEach(b => {
-      const priest = b.priestNameTamil || t('schedule.otherPriests');
+      const priest = isTa
+        ? b.priestNameTamil || b.priestName || t('schedule.otherPriests')
+        : b.priestName || b.priestNameTamil || t('schedule.otherPriests');
       if (!priestGroups[priest]) {
         priestGroups[priest] = [];
       }
@@ -75,119 +65,73 @@ export const BookingTimeline: React.FC<BookingTimelineProps> = ({
     });
 
     return (
-      <View style={styles.timelineContainer}>
+      <View style={styles.listContainer}>
         {Object.entries(priestGroups).map(([priestName, priestBookings]) => (
           <View key={priestName} style={styles.priestSection}>
             {/* Priest Section Header */}
             <View style={styles.priestHeader}>
               <Text style={styles.priestHeaderIcon}>👳</Text>
-              <Text style={styles.priestHeaderTitle}>{priestName}</Text>
+              <Text
+                style={[
+                  styles.priestHeaderTitle,
+                  isTa && styles.priestHeaderTitleTamil,
+                ]}
+                numberOfLines={1}
+              >
+                {priestName}
+              </Text>
               <View style={styles.priestCountBadge}>
-                <Text style={styles.priestCountText}>
+                <Text
+                  style={[
+                    styles.priestCountText,
+                    isTa && styles.priestCountTextTamil,
+                  ]}
+                >
                   {t('schedule.eventsCount', { count: priestBookings.length })}
                 </Text>
               </View>
             </View>
 
-
-            {/* Bookings for this priest */}
-            {priestBookings.map((booking, idx) => (
-              <View key={booking.id} style={styles.row}>
-                {/* Timeline Axis */}
-                <View style={styles.axisContainer}>
-                  <View
-                    style={[
-                      styles.timelineNode,
-                      { backgroundColor: getNodeColor(booking.status) },
-                    ]}
-                  />
-                  {idx < priestBookings.length - 1 && (
-                    <View style={styles.dottedLine} />
-                  )}
-                </View>
-
-                {/* Booking Card */}
-                <View style={styles.cardWrapper}>
-                  <BookingCard
-                    booking={booking}
-                    onPress={() => onSelectBooking?.(booking)}
-                  />
-                </View>
-              </View>
-            ))}
+            {/* Bookings for this priest (Clean, Stepper-Free Cards) */}
+            <View style={styles.cardGroup}>
+              {priestBookings.map(booking => (
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  onPress={() => onSelectBooking?.(booking)}
+                />
+              ))}
+            </View>
           </View>
         ))}
       </View>
     );
   }
 
-  // Standard 'time' mode
+  // Standard 'time' mode: Clean, simple, easy-to-scan list of cards
   return (
-    <View style={styles.timelineContainer}>
-      {bookings.map((booking, index) => {
-        const isLast = index === bookings.length - 1;
-        const nodeColor = getNodeColor(booking.status);
-
-        return (
-          <View key={booking.id} style={styles.row}>
-            {/* Timeline Axis */}
-            <View style={styles.axisContainer}>
-              <View style={[styles.timelineNode, { backgroundColor: nodeColor }]} />
-              {!isLast && <View style={styles.dottedLine} />}
-            </View>
-
-            {/* Booking Card */}
-            <View style={styles.cardWrapper}>
-              <BookingCard
-                booking={booking}
-                onPress={() => onSelectBooking?.(booking)}
-              />
-            </View>
-          </View>
-        );
-      })}
+    <View style={styles.listContainer}>
+      <View style={styles.cardGroup}>
+        {bookings.map(booking => (
+          <BookingCard
+            key={booking.id}
+            booking={booking}
+            onPress={() => onSelectBooking?.(booking)}
+          />
+        ))}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  timelineContainer: {
+  listContainer: {
     paddingHorizontal: 16,
-    paddingTop: 4,
+    paddingTop: 6,
     paddingBottom: 24,
   },
-  row: {
-    flexDirection: 'row',
-  },
-  axisContainer: {
-    width: 28,
-    alignItems: 'center',
-  },
-  timelineNode: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    marginTop: 18,
-    borderWidth: 2.5,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
-    zIndex: 2,
-  },
-  dottedLine: {
-    width: 2,
-    flex: 1,
-    backgroundColor: '#CBD5E1',
-    marginTop: 2,
-    marginBottom: 0,
-    zIndex: 1,
-  },
-  cardWrapper: {
-    flex: 1,
-    paddingLeft: 6,
+  cardGroup: {
+    gap: 10,
   },
   priestSection: {
     marginBottom: 16,
@@ -211,6 +155,11 @@ const styles = StyleSheet.create({
     color: '#074735',
     flex: 1,
   },
+  priestHeaderTitleTamil: {
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
   priestCountBadge: {
     backgroundColor: '#FFFFFF',
     borderRadius: 6,
@@ -221,6 +170,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#64748B',
+  },
+  priestCountTextTamil: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -234,19 +187,28 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: '#074735',
     textAlign: 'center',
     marginBottom: 6,
   },
+  emptyTitleTamil: {
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
   emptySubtitle: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '500',
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 20,
     maxWidth: 290,
   },
+  emptySubtitleTamil: {
+    fontSize: 10.5,
+    fontWeight: '500',
+    lineHeight: 17,
+  },
 });
-

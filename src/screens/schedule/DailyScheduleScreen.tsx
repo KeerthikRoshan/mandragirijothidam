@@ -14,9 +14,10 @@
  * - selectedCategory ('all' | 'jathagam' | 'temple' | 'outdoor')
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -55,7 +56,8 @@ import {
   INITIAL_SCHEDULE_BLOCKS,
   INITIAL_SCHEDULE_BOOKINGS,
 } from '../../data/scheduleMockData';
-import { formatTamilDisplayDate } from '../../utils/dateUtils';
+import { formatTamilDisplayDate, formatDateKey } from '../../utils/dateUtils';
+import { bookingApiService } from '../../services/bookingApiService';
 
 export const DailyScheduleScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -63,8 +65,9 @@ export const DailyScheduleScreen: React.FC = () => {
   const route = useRoute<DailyScheduleScreenRouteProp>();
   const { t } = useTranslation();
 
-  // Default to 2026-11-21 (matches weekly reference) or route initialDate
-  const defaultDate = route?.params?.initialDate || '2026-11-21';
+  // Automatically select current date (today) by default, or route initialDate if provided
+  const todayKey = useMemo(() => formatDateKey(new Date()), []);
+  const defaultDate = route?.params?.initialDate || todayKey;
 
   // Shared Screen State
   const [selectedDate, setSelectedDate] = useState<string>(defaultDate);
@@ -73,9 +76,32 @@ export const DailyScheduleScreen: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<BookingCategory>('all');
   const [bookings, setBookings] = useState<ScheduleBooking[]>(INITIAL_SCHEDULE_BOOKINGS);
   const [blocks] = useState(INITIAL_SCHEDULE_BLOCKS);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   // Add Function Modal State
   const [isAddModalVisible, setIsAddModalVisible] = useState<boolean>(false);
+
+  // Dynamic API load for bookings
+  const loadBookings = useCallback(async () => {
+    try {
+      const data = await bookingApiService.listBookings();
+      if (data && data.length > 0) {
+        setBookings(data);
+      }
+    } catch (err) {
+      console.warn('⚠️ [DailyScheduleScreen] Failed to load bookings from API:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadBookings();
+  }, [loadBookings]);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await loadBookings();
+    setIsRefreshing(false);
+  }, [loadBookings]);
 
   // Derived Tamil Info & Dynamic Summary for Selected Date
   const tamilInfo = useMemo(() => getTamilDateInfo(selectedDate), [selectedDate]);
@@ -123,62 +149,69 @@ export const DailyScheduleScreen: React.FC = () => {
     );
   };
 
-  const handleCreateBooking = (formData: NewBookingFormData) => {
-    const startTime = formData.timeSlot.split('-')[0].trim();
-    const endTime = formData.timeSlot.split('-')[1]?.trim() || '';
+  const handleCreateBooking = async (formData: NewBookingFormData) => {
+    try {
+      const startTime = formData.timeSlot.split('-')[0].trim();
+      const payload = {
+        dateKey: formData.dateKey,
+        booking_date: formData.dateKey,
+        date: formData.dateKey,
+        title: formData.title,
+        clientName: formData.clientName,
+        client_name: formData.clientName,
+        phone: formData.phone,
+        client_phone: formData.phone,
+        alternatePhone: formData.alternatePhone || null,
+        alternate_phone: formData.alternatePhone || null,
+        startTime: startTime,
+        start_time: startTime,
+        durationMinutes: formData.durationMinutes,
+        duration_minutes: formData.durationMinutes,
+        timeSlot: formData.timeSlot,
+        venueType: formData.venueType,
+        venue_type: formData.venueType,
+        location: formData.location,
+        address: formData.address || null,
+        area: formData.area || null,
+        pincode: formData.pincode || null,
+        samagriBy: formData.samagriBy,
+        samagri_by: formData.samagriBy,
+        notes: formData.notes || null,
+        priestId: formData.priestId,
+        priest_id: formData.priestId,
+        priestIds: formData.priestId ? [formData.priestId] : [],
+        priest_ids: formData.priestId ? [formData.priestId] : [],
+        category: formData.category || 'outdoor',
+        category_label_tamil: formData.categoryLabelTamil,
+        totalEventCharge: formData.totalEventCharge,
+        total_event_charge: formData.totalEventCharge,
+        clientAdvanceAmount: formData.clientAdvanceAmount,
+        client_advance_amount: formData.clientAdvanceAmount,
+        clientTotalReceived: formData.clientTotalReceived,
+        client_total_received: formData.clientTotalReceived,
+        priestTotalPay: formData.priestTotalPay,
+        priest_total_pay: formData.priestTotalPay,
+        priestAdvancePaid: formData.priestAdvancePaid,
+        priest_advance_paid: formData.priestAdvancePaid,
+      };
 
-    // Validate availability
-    const validation = validateBookingAvailability(
-      formData.dateKey,
-      startTime,
-      endTime,
-      bookings,
-      blocks
-    );
+      const newBookingItem = await bookingApiService.createBooking(payload);
+      setBookings(prev => [newBookingItem, ...prev]);
+      setIsAddModalVisible(false);
 
-    if (!validation.isValid) {
-      Alert.alert(t('schedule.conflictTitle'), validation.reason || t('schedule.conflictDefault'));
-      return;
+      Alert.alert(
+        t('schedule.bookingConfirmedAlert'),
+        t('schedule.bookingAddedMessage', {
+          date: formatTamilDisplayDate(formData.dateKey),
+          title: newBookingItem.titleTamil || newBookingItem.titleEnglish,
+        })
+      );
+    } catch (err: any) {
+      Alert.alert(
+        t('schedule.conflictTitle') || 'பதிவு பிழை',
+        err?.message || 'பதிவை சேமிக்க முடியவில்லை'
+      );
     }
-
-    const newBookingItem: ScheduleBooking = {
-      id: `b-${Date.now()}`,
-      date: formData.dateKey,
-      timeSlot: formData.timeSlot,
-      startTime,
-      endTime,
-      titleTamil: formData.title,
-      category: formData.category,
-      categoryLabelTamil: formData.categoryLabelTamil,
-      status: 'confirmed',
-      statusLabelTamil: 'உறுதி செய்யப்பட்டது',
-      clientName: formData.clientName,
-      clientPhone: formData.phone,
-      locationTamil: formData.location,
-      priestId: formData.priestId,
-      priestNameTamil: formData.priestName,
-      priestPhone: formData.priestPhone,
-      amount: formData.totalEventCharge > 0 ? `₹ ${formData.totalEventCharge.toLocaleString('en-IN')}` : undefined,
-      totalEventCharge: formData.totalEventCharge,
-      clientAdvanceAmount: formData.clientAdvanceAmount,
-      clientTotalReceived: formData.clientTotalReceived,
-      clientBalanceAmount: formData.clientBalanceAmount,
-      priestTotalPay: formData.priestTotalPay,
-      priestAdvancePaid: formData.priestAdvancePaid,
-      priestBalanceAmount: formData.priestBalanceAmount,
-    };
-
-    setBookings(prev => [...prev, newBookingItem]);
-
-    setIsAddModalVisible(false);
-
-    Alert.alert(
-      t('schedule.bookingConfirmedAlert'),
-      t('schedule.bookingAddedMessage', {
-        date: formatTamilDisplayDate(formData.dateKey),
-        title: newBookingItem.titleTamil,
-      })
-    );
   };
 
 
@@ -210,6 +243,14 @@ export const DailyScheduleScreen: React.FC = () => {
           },
         ]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={['#0B5E41']}
+            tintColor="#0B5E41"
+          />
+        }
       >
         {/* 2. Calendar Display: Weekly or Monthly */}
         {calendarMode === 'week' ? (

@@ -108,6 +108,9 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const fullUrl = error.config ? `${error.config.baseURL || ''}${error.config.url || ''}` : 'UNKNOWN';
     console.error(`❌ [apiClient Response Error] ${error.response?.status || error.code || 'NETWORK_ERROR'} ${fullUrl}`);
+    if (error.response?.data) {
+      console.error('📋 [apiClient Error Body]:', JSON.stringify(error.response.data, null, 2));
+    }
     const originalRequest = error.config as InternalAxiosRequestConfig & {
       _retry?: boolean;
     };

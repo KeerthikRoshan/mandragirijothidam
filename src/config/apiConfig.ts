@@ -10,7 +10,7 @@ export type Environment = 'development' | 'test' | 'preprod' | 'production';
 
 export const ENVIRONMENTS: Record<Environment, { BASE_URL: string }> = {
   development: {
-    BASE_URL: 'http://192.168.43.142:5000',
+    BASE_URL: 'http://10.216.197.141:5000',
   },
   test: {
     BASE_URL: 'https://test-api.mandhragirijothidam.com',
@@ -63,6 +63,18 @@ export const API_CONFIG = {
       DAILY: '/attendance/daily',
       RECORD: '/attendance/record',
       MONTHLY: (staffId: string | number) => `/attendance/${staffId}/monthly`,
+    },
+    BOOKINGS: {
+      LIST: '/bookings',
+      CREATE: '/bookings',
+      CHECK_AVAILABILITY: '/bookings/check-availability',
+      EVENT_TYPES: '/bookings/event-types',
+      BY_DATE: (date: string) => `/bookings?date=${date}`,
+      BY_PRIEST: (priestId: string | number) => `/bookings/priest/${priestId}`,
+      DETAILS: (id: string | number) => `/bookings/${id}`,
+      UPDATE: (id: string | number) => `/bookings/${id}`,
+      DELETE: (id: string | number) => `/bookings/${id}`,
+      PAYMENTS: (id: string | number) => `/bookings/${id}/payments`,
     },
   },
   HEADERS: {

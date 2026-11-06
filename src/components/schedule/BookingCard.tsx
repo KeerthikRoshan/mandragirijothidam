@@ -2,6 +2,7 @@
  * BookingCard Component
  * Displays a single booking item with time slot pill, status badge,
  * event title, category label, client name, venue, phone, and assigned priest.
+ * Clean, simple layout with refined Tamil/English typography.
  */
 
 import React from 'react';
@@ -22,7 +23,8 @@ interface BookingCardProps {
 }
 
 export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isTa = (i18n.language || 'ta').startsWith('ta');
 
   const getStatusStyles = (status: BookingStatus) => {
     switch (status) {
@@ -62,7 +64,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress }) =>
         return {
           container: styles.statusPending,
           text: styles.statusTextPending,
-          label: booking.statusLabelTamil,
+          label: isTa ? booking.statusLabelTamil : status,
           timeContainer: styles.timeGreen,
           timeText: styles.timeTextGreen,
         };
@@ -71,19 +73,34 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress }) =>
 
   const statusStyle = getStatusStyles(booking.status);
 
-
   const handleCall = () => {
     if (booking.clientPhone) {
       Linking.openURL(`tel:${booking.clientPhone.replace(/\s+/g, '')}`).catch(() => {});
     }
   };
 
+  const displayTitle = isTa
+    ? booking.titleTamil || booking.title || booking.titleEnglish
+    : booking.titleEnglish || booking.title || booking.titleTamil;
+
+  const displayCategory = isTa
+    ? booking.categoryLabelTamil || t(`schedule.categories.${booking.category}`) || booking.category
+    : t(`schedule.categories.${booking.category}`) || booking.category;
+
+  const displayLocation = isTa
+    ? booking.locationTamil || booking.location
+    : booking.location || booking.locationTamil;
+
+  const displayPriest = isTa
+    ? booking.priestNameTamil || booking.priestName
+    : booking.priestName || booking.priestNameTamil;
+
   return (
     <Pressable
       onPress={onPress}
       style={styles.card}
       accessibilityRole="button"
-      accessibilityLabel={`${booking.titleTamil}, ${booking.timeSlot}, ${statusStyle.label}`}
+      accessibilityLabel={`${displayTitle}, ${booking.timeSlot}, ${statusStyle.label}`}
     >
       {/* Top Row: Time Slot Badge & Status Badge */}
       <View style={styles.topRow}>
@@ -95,17 +112,36 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress }) =>
         </View>
 
         <View style={[styles.statusBadge, statusStyle.container]}>
-          <Text style={[styles.statusText, statusStyle.text]}>
+          <Text
+            style={[
+              styles.statusText,
+              statusStyle.text,
+              isTa && styles.statusTextTamil,
+            ]}
+            numberOfLines={1}
+          >
             {statusStyle.label}
           </Text>
         </View>
       </View>
 
       {/* Title & Category */}
-      <Text style={styles.titleText}>{booking.titleTamil}</Text>
-      <Text style={styles.categorySubtext}>
-        {booking.categoryLabelTamil}
-        {booking.titleEnglish ? ` • ${booking.titleEnglish}` : ''}
+      <Text
+        style={[
+          styles.titleText,
+          isTa && styles.titleTextTamil,
+        ]}
+      >
+        {displayTitle}
+      </Text>
+      <Text
+        style={[
+          styles.categorySubtext,
+          isTa && styles.categorySubtextTamil,
+        ]}
+      >
+        {displayCategory}
+        {isTa && booking.titleEnglish ? ` • ${booking.titleEnglish}` : ''}
       </Text>
 
       {/* Divider */}
@@ -116,7 +152,13 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress }) =>
         {/* Client Name */}
         <View style={styles.detailRow}>
           <User size={13} color="#074735" style={styles.detailIcon} />
-          <Text style={styles.detailText} numberOfLines={1}>
+          <Text
+            style={[
+              styles.detailText,
+              isTa && styles.detailTextTamil,
+            ]}
+            numberOfLines={1}
+          >
             {booking.clientName}
           </Text>
         </View>
@@ -124,8 +166,14 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress }) =>
         {/* Location */}
         <View style={styles.detailRow}>
           <MapPin size={13} color="#074735" style={styles.detailIcon} />
-          <Text style={styles.detailText} numberOfLines={1}>
-            {booking.locationTamil}
+          <Text
+            style={[
+              styles.detailText,
+              isTa && styles.detailTextTamil,
+            ]}
+            numberOfLines={1}
+          >
+            {displayLocation}
           </Text>
         </View>
 
@@ -133,8 +181,14 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress }) =>
         <View style={styles.bottomDetailRow}>
           <View style={styles.priestContainer}>
             <Text style={styles.priestSymbol}>👳</Text>
-            <Text style={styles.priestText} numberOfLines={1}>
-              {booking.priestNameTamil}
+            <Text
+              style={[
+                styles.priestText,
+                isTa && styles.priestTextTamil,
+              ]}
+              numberOfLines={1}
+            >
+              {displayPriest}
             </Text>
           </View>
 
@@ -155,19 +209,36 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress }) =>
         {/* Payment Summary Row if present */}
         {(booking.totalEventCharge !== undefined || booking.amount) && (
           <View style={styles.paymentSummaryRow}>
-            <Text style={styles.paymentAmountText}>
+            <Text
+              style={[
+                styles.paymentAmountText,
+                isTa && styles.paymentAmountTextTamil,
+              ]}
+            >
               💰 {t('common.fee')}: {booking.amount || `₹ ${booking.totalEventCharge?.toLocaleString('en-IN')}`}
             </Text>
             {booking.clientBalanceAmount !== undefined && booking.clientBalanceAmount > 0 && (
               <View style={styles.cardDueBadge}>
-                <Text style={styles.cardDueBadgeText}>
+                <Text
+                  style={[
+                    styles.cardDueBadgeText,
+                    isTa && styles.cardDueBadgeTextTamil,
+                  ]}
+                >
                   {t('schedule.summaryPending')}: ₹ {booking.clientBalanceAmount.toLocaleString('en-IN')}
                 </Text>
               </View>
             )}
             {booking.clientBalanceAmount === 0 && (booking.totalEventCharge || 0) > 0 && (
               <View style={styles.cardPaidBadge}>
-                <Text style={styles.cardPaidBadgeText}>{t('schedule.paid')}</Text>
+                <Text
+                  style={[
+                    styles.cardPaidBadgeText,
+                    isTa && styles.cardPaidBadgeTextTamil,
+                  ]}
+                >
+                  {t('schedule.paid')}
+                </Text>
               </View>
             )}
           </View>
@@ -177,7 +248,6 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress }) =>
     </Pressable>
   );
 };
-
 
 const styles = StyleSheet.create({
   card: {
@@ -191,7 +261,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 3,
     elevation: 2,
-    marginBottom: 12,
+    marginBottom: 2,
   },
   topRow: {
     flexDirection: 'row',
@@ -246,6 +316,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+  statusTextTamil: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.1,
+  },
   statusConfirmed: {
     backgroundColor: '#E5F7EE',
   },
@@ -276,10 +351,22 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     marginBottom: 2,
   },
+  titleTextTamil: {
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+    marginBottom: 2,
+  },
   categorySubtext: {
     fontSize: 12,
     fontWeight: '500',
     color: '#64748B',
+    marginBottom: 8,
+  },
+  categorySubtextTamil: {
+    fontSize: 11,
+    fontWeight: '500',
+    lineHeight: 16,
     marginBottom: 8,
   },
   divider: {
@@ -303,6 +390,12 @@ const styles = StyleSheet.create({
     color: '#334155',
     flexShrink: 1,
   },
+  detailTextTamil: {
+    fontSize: 11,
+    fontWeight: '500',
+    lineHeight: 16,
+    flexShrink: 1,
+  },
   bottomDetailRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -323,6 +416,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#074735', // Forest green priest name
+    flexShrink: 1,
+  },
+  priestTextTamil: {
+    fontSize: 11,
+    fontWeight: '600',
+    lineHeight: 16,
     flexShrink: 1,
   },
   phoneChip: {
@@ -358,6 +457,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#074735',
   },
+  paymentAmountTextTamil: {
+    fontSize: 10.5,
+    fontWeight: '700',
+  },
   cardDueBadge: {
     backgroundColor: '#FEF3C7',
     paddingHorizontal: 5,
@@ -368,6 +471,10 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#B45309',
+  },
+  cardDueBadgeTextTamil: {
+    fontSize: 9.5,
+    fontWeight: '700',
   },
   cardPaidBadge: {
     backgroundColor: '#DCFCE7',
@@ -380,5 +487,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#15803D',
   },
+  cardPaidBadgeTextTamil: {
+    fontSize: 9.5,
+    fontWeight: '700',
+  },
 });
-

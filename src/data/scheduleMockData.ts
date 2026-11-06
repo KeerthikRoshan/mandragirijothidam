@@ -4,8 +4,56 @@
  */
 
 import { ScheduleBooking, ScheduleBlock } from '../types/schedule';
+import { formatDateKey } from '../utils/dateUtils';
+
+const todayKey = formatDateKey(new Date());
 
 export const INITIAL_SCHEDULE_BOOKINGS: ScheduleBooking[] = [
+  // ==========================================
+  // TODAY'S BOOKINGS (Dynamic Initial State)
+  // ==========================================
+  ...(todayKey !== '2026-11-21'
+    ? [
+        {
+          id: `b-today-1`,
+          date: todayKey,
+          timeSlot: '09:00 AM - 10:30 AM',
+          startTime: '09:00 AM',
+          endTime: '10:30 AM',
+          titleTamil: 'கணபதி ஹோமம் & சங்கல்ப பூஜை',
+          titleEnglish: 'Ganapathi Homam',
+          category: 'temple' as const,
+          categoryLabelTamil: 'கோவில்',
+          status: 'confirmed' as const,
+          statusLabelTamil: 'உறுதி செய்யப்பட்டது',
+          clientName: 'திரு. எஸ். கல்யாணசுந்தரம்',
+          clientPhone: '+91 98401 22334',
+          locationTamil: 'ஸ்ரீ மந்திரகிரி ஜோதிட பீடம்',
+          priestNameTamil: 'சிவஸ்ரீ கார்த்திக் சாஸ்திரிகள்',
+          priestPhone: '+91 94422 11001',
+          amount: '₹ 2,500',
+        },
+        {
+          id: `b-today-2`,
+          date: todayKey,
+          timeSlot: '11:00 AM - 12:30 PM',
+          startTime: '11:00 AM',
+          endTime: '12:30 PM',
+          titleTamil: 'ஜாதக கணிப்பு & பலன் பார்த்தல்',
+          titleEnglish: 'Jathagam Consultation',
+          category: 'jathagam' as const,
+          categoryLabelTamil: 'ஜாதகம்',
+          status: 'upcoming' as const,
+          statusLabelTamil: 'வரவிருப்பது',
+          clientName: 'திருமதி. மீனாட்சி அம்மாள்',
+          clientPhone: '+91 98421 88990',
+          locationTamil: 'ஸ்ரீ மந்திரகிரி ஜோதிட பீடம்',
+          priestNameTamil: 'சுவாமி சுந்தரமூர்த்தி குருக்கள்',
+          priestPhone: '+91 94422 11002',
+          amount: '₹ 1,000',
+        },
+      ]
+    : []),
   // ==========================================
   // NOVEMBER 21, 2026 (Weekly Reference Image)
   // ==========================================
