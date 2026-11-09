@@ -41,6 +41,8 @@ import { PriestProfileCard } from '../../components/priest/PriestProfileCard';
 import { PriestBookingTabs } from '../../components/priest/PriestBookingTabs';
 import { AddPriestModal } from '../../components/priest/AddPriestModal';
 import { BookingCard } from '../../components/schedule/BookingCard';
+import { BookingDetailModal } from '../../components/common/BookingDetailModal';
+import { buildBookingPayload, isBookingEditable } from '../../utils/bookingRules';
 import { NewBookingButton } from '../../components/dashboard/NewBookingButton';
 import { DashboardBottomNav } from '../../components/dashboard/DashboardBottomNav';
 import {
@@ -74,6 +76,12 @@ export const PriestScreen: React.FC = () => {
     useState<boolean>(false);
   const [isRegistrationModalVisible, setIsRegistrationModalVisible] =
     useState<boolean>(false);
+  const [selectedBooking, setSelectedBooking] =
+    useState<ScheduleBooking | null>(null);
+  const [isDetailModalVisible, setIsDetailModalVisible] =
+    useState<boolean>(false);
+  const [editingBooking, setEditingBooking] =
+    useState<ScheduleBooking | null>(null);
 
   // Dynamic Priest Bookings fetched from backend API
   const [dynamicPriestBookings, setDynamicPriestBookings] = useState<ScheduleBooking[]>([]);
@@ -214,7 +222,11 @@ export const PriestScreen: React.FC = () => {
         },
       };
     }
-    return getPriestBookingCategories(priestBookings, '2026-10-16');
+    const anchor =
+      priestBookings.length > 0 && priestBookings[0].date === '2026-10-16'
+        ? '2026-10-16'
+        : new Date();
+    return getPriestBookingCategories(priestBookings, anchor);
   }, [selectedPriest, priestBookings]);
 
   // Bookings to display under current tab — guaranteed to match tab count exactly
@@ -223,10 +235,22 @@ export const PriestScreen: React.FC = () => {
   }, [bookingCategories, activeBookingTab]);
 
   const handleBookingPress = (booking: ScheduleBooking) => {
-    Alert.alert(
-      booking.titleTamil,
-      `நேரம்: ${booking.timeSlot}\nவாடிக்கையாளர்: ${booking.clientName}\nஇடம்: ${booking.locationTamil || 'ஆலயம்'}\nநிலை: ${booking.statusLabelTamil}`
-    );
+    setSelectedBooking(booking);
+    setIsDetailModalVisible(true);
+  };
+
+  const handleEditBooking = (booking: ScheduleBooking) => {
+    const check = isBookingEditable(booking);
+    if (!check.isEditable) {
+      Alert.alert(
+        t('bookingDetail.editUnavailable'),
+        check.reasonTa || check.reasonEn || t('bookingDetail.editNotice')
+      );
+      return;
+    }
+    setIsDetailModalVisible(false);
+    setEditingBooking(booking);
+    setIsRegistrationModalVisible(true);
   };
 
   const handleAddNewPriest = (newPriest: PriestStaffItem) => {
@@ -236,62 +260,37 @@ export const PriestScreen: React.FC = () => {
 
   const handleCreateBooking = async (formData: NewBookingFormData) => {
     try {
-      const startTime = formData.timeSlot.split('-')[0].trim();
       const targetPriestId = formData.priestId || (selectedPriest ? selectedPriest.id : undefined);
-      const payload = {
-        dateKey: formData.dateKey,
-        booking_date: formData.dateKey,
-        date: formData.dateKey,
-        title: formData.title,
-        clientName: formData.clientName,
-        client_name: formData.clientName,
-        phone: formData.phone,
-        client_phone: formData.phone,
-        alternatePhone: formData.alternatePhone || null,
-        alternate_phone: formData.alternatePhone || null,
-        startTime: startTime,
-        start_time: startTime,
-        durationMinutes: formData.durationMinutes,
-        duration_minutes: formData.durationMinutes,
-        timeSlot: formData.timeSlot,
-        venueType: formData.venueType,
-        venue_type: formData.venueType,
-        location: formData.location,
-        address: formData.address || null,
-        area: formData.area || null,
-        pincode: formData.pincode || null,
-        samagriBy: formData.samagriBy,
-        samagri_by: formData.samagriBy,
-        notes: formData.notes || null,
+      const payload = buildBookingPayload({
+        ...formData,
         priestId: targetPriestId,
-        priest_id: targetPriestId,
-        priestIds: targetPriestId ? [targetPriestId] : [],
-        priest_ids: targetPriestId ? [targetPriestId] : [],
-        category: formData.category || 'outdoor',
-        category_label_tamil: formData.categoryLabelTamil,
-        totalEventCharge: formData.totalEventCharge,
-        total_event_charge: formData.totalEventCharge,
-        clientAdvanceAmount: formData.clientAdvanceAmount,
-        client_advance_amount: formData.clientAdvanceAmount,
-        clientTotalReceived: formData.clientTotalReceived,
-        client_total_received: formData.clientTotalReceived,
-        priestTotalPay: formData.priestTotalPay,
-        priest_total_pay: formData.priestTotalPay,
-        priestAdvancePaid: formData.priestAdvancePaid,
-        priest_advance_paid: formData.priestAdvancePaid,
-      };
+      });
 
-      const newBooking = await bookingApiService.createBooking(payload);
-      setIsRegistrationModalVisible(false);
-      if (selectedPriest?.id) {
-        await loadPriestBookings(selectedPriest.id);
+      if (editingBooking) {
+        const updated = await bookingApiService.updateBooking(editingBooking.id, payload);
+        setIsRegistrationModalVisible(false);
+        setEditingBooking(null);
+        if (selectedPriest?.id) {
+          await loadPriestBookings(selectedPriest.id);
+        }
+        Alert.alert(
+          'முன்பதிவு புதுப்பிக்கப்பட்டது',
+          `${updated.titleTamil || updated.titleEnglish || updated.title} விவரங்கள் வெற்றிகரமாக மாற்றப்பட்டது.`
+        );
+      } else {
+        const newBooking = await bookingApiService.createBooking(payload);
+        setIsRegistrationModalVisible(false);
+        if (selectedPriest?.id) {
+          await loadPriestBookings(selectedPriest.id);
+        }
+        Alert.alert(
+          'பூஜை பதிவு வெற்றிகரமாக சேர்க்கப்பட்டது',
+          `${newBooking.titleTamil || newBooking.titleEnglish} (${formData.timeSlot})\nபக்தர்: ${formData.clientName}\nபுரோகிதர்: ${formData.priestName}`
+        );
       }
-      Alert.alert(
-        'பூஜை பதிவு வெற்றிகரமாக சேர்க்கப்பட்டது',
-        `${newBooking.titleTamil || newBooking.titleEnglish} (${formData.timeSlot})\nபக்தர்: ${formData.clientName}\nபுரோகிதர்: ${formData.priestName}`
-      );
     } catch (err: any) {
-      Alert.alert('பதிவு பிழை', err?.message || 'பூஜை பதிவை சேர்க்க முடியவில்லை');
+      Alert.alert('பதிவு பிழை', err?.message || 'பூஜை பதிவை சேமிக்க முடியவில்லை');
+      throw err;
     }
   };
 
@@ -404,6 +403,7 @@ export const PriestScreen: React.FC = () => {
                   <BookingCard
                     key={booking.id}
                     booking={booking}
+                    showDate={activeBookingTab === 'past' || activeBookingTab === 'upcoming'}
                     onPress={() => handleBookingPress(booking)}
                   />
                 ))
@@ -461,11 +461,24 @@ export const PriestScreen: React.FC = () => {
         onSubmit={handleAddNewPriest}
       />
 
-      {/* 2. Shared Pooja Registration Modal (triggered by bottom floating "+ பூஜை பதிவு (New)" button) */}
+      {/* 2. Shared Pooja Registration / Edit Modal */}
       <PoojaBookingFormModal
         visible={isRegistrationModalVisible}
-        onClose={() => setIsRegistrationModalVisible(false)}
+        initialBooking={editingBooking || undefined}
+        editBooking={editingBooking || undefined}
+        onClose={() => {
+          setIsRegistrationModalVisible(false);
+          setEditingBooking(null);
+        }}
         onSubmit={handleCreateBooking}
+      />
+
+      {/* 3. Shared Pooja Details Modal */}
+      <BookingDetailModal
+        visible={isDetailModalVisible}
+        booking={selectedBooking}
+        onClose={() => setIsDetailModalVisible(false)}
+        onEdit={handleEditBooking}
       />
     </View>
   );

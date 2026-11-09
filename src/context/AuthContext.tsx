@@ -21,6 +21,7 @@ import {
 import { AuthUserProfile } from '../types/staffPortal';
 import { setOnAuthExpired } from '../services/apiClient';
 import { getAppLanguage } from '../i18n';
+import { deviceService } from '../services/deviceService';
 
 export interface AuthContextType {
   isAuthenticated: boolean;
@@ -60,6 +61,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setRole(result.role);
       setMustChangePassword(Boolean(result.mustChangePassword));
       setIsOffline(Boolean(result.isOffline));
+
+      if (result.isAuthenticated) {
+        deviceService.registerDevice().catch(() => {});
+      }
+
       return result;
     } finally {
       setIsLoading(false);
@@ -112,6 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setRole(result.session.role);
         setMustChangePassword(Boolean(result.session.mustChangePassword));
         setIsOffline(false);
+        deviceService.registerDevice().catch(() => {});
       }
 
       return result;
@@ -133,6 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setRole(result.session.role);
         setMustChangePassword(Boolean(result.session.mustChangePassword));
         setIsOffline(false);
+        deviceService.registerDevice().catch(() => {});
       }
 
       return result;

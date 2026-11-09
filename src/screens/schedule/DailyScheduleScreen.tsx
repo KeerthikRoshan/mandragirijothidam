@@ -34,6 +34,8 @@ import { DateSummary } from '../../components/schedule/DateSummary';
 import { ScheduleViewToggle } from '../../components/schedule/ScheduleViewToggle';
 import { ScheduleCategoryFilters } from '../../components/schedule/ScheduleCategoryFilters';
 import { BookingTimeline } from '../../components/schedule/BookingTimeline';
+import { BookingDetailModal } from '../../components/common/BookingDetailModal';
+import { buildBookingPayload, isBookingEditable, sortBookingsChronologically } from '../../utils/bookingRules';
 import { NewBookingButton } from '../../components/dashboard/NewBookingButton';
 import { DashboardBottomNav } from '../../components/dashboard/DashboardBottomNav';
 import {
@@ -80,6 +82,9 @@ export const DailyScheduleScreen: React.FC = () => {
 
   // Add Function Modal State
   const [isAddModalVisible, setIsAddModalVisible] = useState<boolean>(false);
+  const [selectedBooking, setSelectedBooking] = useState<ScheduleBooking | null>(null);
+  const [isDetailModalVisible, setIsDetailModalVisible] = useState<boolean>(false);
+  const [editingBooking, setEditingBooking] = useState<ScheduleBooking | null>(null);
 
   // Dynamic API load for bookings
   const loadBookings = useCallback(async () => {
@@ -125,11 +130,12 @@ export const DailyScheduleScreen: React.FC = () => {
     ];
   }, [selectedDate, bookings, t]);
 
-  // Filter Bookings for Timeline Display
+  // Filter Bookings for Timeline Display (Strictly sorted chronologically)
   const displayedBookings = useMemo(() => {
-    return bookings
+    const filtered = bookings
       .filter(b => b.date === selectedDate)
       .filter(b => (selectedCategory === 'all' ? true : b.category === selectedCategory));
+    return sortBookingsChronologically(filtered);
   }, [bookings, selectedDate, selectedCategory]);
 
   // Handlers
@@ -142,75 +148,59 @@ export const DailyScheduleScreen: React.FC = () => {
   };
 
   const handleBookingPress = (booking: ScheduleBooking) => {
-    Alert.alert(
-      booking.titleTamil,
-      `நேரம்: ${booking.timeSlot}\nவாடிக்கையாளர்: ${booking.clientName}\nதொலைபேசி: ${booking.clientPhone}\nஇடம்: ${booking.locationTamil}\nபுரோகிதர்: ${booking.priestNameTamil}\nநிலை: ${booking.statusLabelTamil}`,
-      [{ text: t('common.ok') }]
-    );
+    setSelectedBooking(booking);
+    setIsDetailModalVisible(true);
+  };
+
+  const handleEditBooking = (booking: ScheduleBooking) => {
+    const check = isBookingEditable(booking);
+    if (!check.isEditable) {
+      Alert.alert(
+        t('bookingDetail.editUnavailable'),
+        check.reasonTa || check.reasonEn || t('bookingDetail.editNotice')
+      );
+      return;
+    }
+    setIsDetailModalVisible(false);
+    setEditingBooking(booking);
+    setIsAddModalVisible(true);
   };
 
   const handleCreateBooking = async (formData: NewBookingFormData) => {
     try {
-      const startTime = formData.timeSlot.split('-')[0].trim();
-      const payload = {
-        dateKey: formData.dateKey,
-        booking_date: formData.dateKey,
-        date: formData.dateKey,
-        title: formData.title,
-        clientName: formData.clientName,
-        client_name: formData.clientName,
-        phone: formData.phone,
-        client_phone: formData.phone,
-        alternatePhone: formData.alternatePhone || null,
-        alternate_phone: formData.alternatePhone || null,
-        startTime: startTime,
-        start_time: startTime,
-        durationMinutes: formData.durationMinutes,
-        duration_minutes: formData.durationMinutes,
-        timeSlot: formData.timeSlot,
-        venueType: formData.venueType,
-        venue_type: formData.venueType,
-        location: formData.location,
-        address: formData.address || null,
-        area: formData.area || null,
-        pincode: formData.pincode || null,
-        samagriBy: formData.samagriBy,
-        samagri_by: formData.samagriBy,
-        notes: formData.notes || null,
-        priestId: formData.priestId,
-        priest_id: formData.priestId,
-        priestIds: formData.priestId ? [formData.priestId] : [],
-        priest_ids: formData.priestId ? [formData.priestId] : [],
-        category: formData.category || 'outdoor',
-        category_label_tamil: formData.categoryLabelTamil,
-        totalEventCharge: formData.totalEventCharge,
-        total_event_charge: formData.totalEventCharge,
-        clientAdvanceAmount: formData.clientAdvanceAmount,
-        client_advance_amount: formData.clientAdvanceAmount,
-        clientTotalReceived: formData.clientTotalReceived,
-        client_total_received: formData.clientTotalReceived,
-        priestTotalPay: formData.priestTotalPay,
-        priest_total_pay: formData.priestTotalPay,
-        priestAdvancePaid: formData.priestAdvancePaid,
-        priest_advance_paid: formData.priestAdvancePaid,
-      };
+      const payload = buildBookingPayload(formData);
 
-      const newBookingItem = await bookingApiService.createBooking(payload);
-      setBookings(prev => [newBookingItem, ...prev]);
-      setIsAddModalVisible(false);
+      if (editingBooking) {
+        const updated = await bookingApiService.updateBooking(editingBooking.id, payload);
+        setBookings(prev => prev.map(b => (b.id === updated.id ? updated : b)));
+        setIsAddModalVisible(false);
+        setEditingBooking(null);
 
-      Alert.alert(
-        t('schedule.bookingConfirmedAlert'),
-        t('schedule.bookingAddedMessage', {
-          date: formatTamilDisplayDate(formData.dateKey),
-          title: newBookingItem.titleTamil || newBookingItem.titleEnglish,
-        })
-      );
+        Alert.alert(
+          t('schedule.bookingUpdatedAlert') || 'முன்பதிவு புதுப்பிக்கப்பட்டது',
+          t('schedule.bookingUpdatedMessage', {
+            title: updated.titleTamil || updated.titleEnglish || updated.title,
+          }) || `${updated.titleTamil || updated.titleEnglish || updated.title} விவரங்கள் வெற்றிகரமாக மாற்றப்பட்டது.`
+        );
+      } else {
+        const newBookingItem = await bookingApiService.createBooking(payload);
+        setBookings(prev => [newBookingItem, ...prev]);
+        setIsAddModalVisible(false);
+
+        Alert.alert(
+          t('schedule.bookingConfirmedAlert'),
+          t('schedule.bookingAddedMessage', {
+            date: formatTamilDisplayDate(formData.dateKey),
+            title: newBookingItem.titleTamil || newBookingItem.titleEnglish,
+          })
+        );
+      }
     } catch (err: any) {
       Alert.alert(
         t('schedule.conflictTitle') || 'பதிவு பிழை',
         err?.message || 'பதிவை சேமிக்க முடியவில்லை'
       );
+      throw err;
     }
   };
 
@@ -326,12 +316,25 @@ export const DailyScheduleScreen: React.FC = () => {
         }}
       />
 
-      {/* Shared Bottom-Up Registration Modal */}
+      {/* Shared Bottom-Up Registration / Edit Modal */}
       <PoojaBookingFormModal
         visible={isAddModalVisible}
-        onClose={() => setIsAddModalVisible(false)}
+        initialBooking={editingBooking || undefined}
+        editBooking={editingBooking || undefined}
+        onClose={() => {
+          setIsAddModalVisible(false);
+          setEditingBooking(null);
+        }}
         onSubmit={handleCreateBooking}
         selectedDate={selectedDate}
+      />
+
+      {/* Shared Pooja Details Modal */}
+      <BookingDetailModal
+        visible={isDetailModalVisible}
+        booking={selectedBooking}
+        onClose={() => setIsDetailModalVisible(false)}
+        onEdit={handleEditBooking}
       />
     </View>
   );

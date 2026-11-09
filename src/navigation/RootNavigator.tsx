@@ -23,6 +23,9 @@ import { StaffAttendanceScreen } from '../screens/staff/StaffAttendanceScreen';
 import { StaffLeavesScreen } from '../screens/staff/StaffLeavesScreen';
 import { StaffMoreScreen } from '../screens/staff/StaffMoreScreen';
 import { AdminLeaveManagementScreen } from '../screens/admin/AdminLeaveManagementScreen';
+import { UpcomingEventsScreen } from '../screens/events/UpcomingEventsScreen';
+import { CompletedEventsScreen } from '../screens/events/CompletedEventsScreen';
+import { FinancialAuditsScreen } from '../screens/financial/FinancialAuditsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -83,6 +86,11 @@ export const RootNavigator: React.FC = () => {
 
         {/* Admin: Staff Leave Requests Management Screen */}
         <Stack.Screen name="AdminLeaveManagement" component={AdminLeaveManagementScreen} />
+
+        {/* Dedicated Event & Financial Screens */}
+        <Stack.Screen name="UpcomingEvents" component={UpcomingEventsScreen} />
+        <Stack.Screen name="CompletedEvents" component={CompletedEventsScreen} />
+        <Stack.Screen name="FinancialAudits" component={FinancialAuditsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

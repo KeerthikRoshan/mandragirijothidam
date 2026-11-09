@@ -66,12 +66,17 @@ export interface ScheduleBooking {
   id: string;
   bookingNumber?: string;
   date: string; // YYYY-MM-DD
-  timeSlot: string; // e.g. "09:30 AM - 10:30 AM"
+  endDate?: string; // YYYY-MM-DD
+  timeSlot: string; // e.g. "09:30 AM - 10:30 AM" or "07:00 AM - 12:00 AM (Next Day)"
   startTime: string; // "09:30 AM"
   endTime: string; // "10:30 AM"
   durationMinutes?: number;
+  daysOffset?: number;
+  startDateTime?: string;
+  endDateTime?: string;
   titleTamil: string; // e.g. "ஜாதக கணிப்பு & பலன் பார்த்தல்"
   titleEnglish?: string; // "Jathagam Consultation"
+  title?: string;
   eventTypeId?: string | null;
   eventTypeNameEnglish?: string | null;
   eventTypeNameTamil?: string | null;
@@ -85,6 +90,7 @@ export interface ScheduleBooking {
   venueType?: VenueType;
   locationTamil: string; // e.g. "ஸ்ரீ மந்திரகிரி ஜோதிட பீடம்"
   locationEnglish?: string;
+  location?: string;
   address?: string | null;
   area?: string | null;
   pincode?: string | null;
@@ -95,6 +101,7 @@ export interface ScheduleBooking {
 
   priestNameTamil: string; // e.g. "சுவாமி சுந்தரமூர்த்தி குருக்கள்"
   priestNameEnglish?: string;
+  priestName?: string;
   priestPhone?: string;
   amount?: string;
   nakshatra?: string;
@@ -152,4 +159,69 @@ export interface CategoryFilterItem {
   labelTamil: string;
   labelEnglish: string;
   count: number;
+}
+
+export interface FinancialAuditSummaryData {
+  totalBookings: number;
+  totalBilled: number;
+  totalCollected: number;
+  clientOutstanding: number;
+  priestTotalDue: number;
+  priestSettled: number;
+  priestPendingSettlement: number;
+  netPeedamMargin: number;
+  fullyPaidCount: number;
+  partialPaidCount: number;
+  pendingPaidCount: number;
+  priestSettledCount: number;
+  priestPendingCount: number;
+}
+
+export interface ClientReceivableItem {
+  id: string;
+  bookingNumber: string;
+  dateKey: string;
+  title: string;
+  clientName: string;
+  clientPhone: string;
+  location?: string;
+  priestName?: string;
+  totalEventCharge: number;
+  clientAdvanceAmount: number;
+  clientTotalReceived: number;
+  clientBalanceAmount: number;
+  clientPaymentStatus: PaymentStatus;
+  status: BookingStatus;
+}
+
+export interface PriestSettlementItem {
+  priestId: string;
+  priestName: string;
+  priestNameTamil: string;
+  phone?: string | null;
+  staffRole?: string;
+  bookingCount: number;
+  totalPay: number;
+  advancePaid: number;
+  balanceDue: number;
+  settlementStatus: 'settled' | 'partial' | 'pending';
+}
+
+export interface FinancialAuditTransactionItem {
+  id: string;
+  bookingId: string;
+  bookingNumber?: string;
+  title?: string;
+  clientName?: string;
+  staffId?: string | null;
+  staffName?: string | null;
+  staffNameTamil?: string | null;
+  party: 'client' | 'priest';
+  amount: number;
+  paymentMethod: string;
+  transactionType: string;
+  reference?: string | null;
+  notes?: string | null;
+  paidAt?: string | null;
+  createdByName?: string | null;
 }

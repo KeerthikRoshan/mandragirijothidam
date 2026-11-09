@@ -64,6 +64,8 @@ import { AttendanceSwipeControl } from '../../components/attendance/AttendanceSw
 import { StaffBottomNav } from '../../components/staff/StaffBottomNav';
 import { StaffAttendanceRecord } from '../../types/attendance';
 import { StaffAssignedEvent, StaffReminder, StaffUserProfile } from '../../types/staffPortal';
+import { ScheduleBooking } from '../../types/schedule';
+import { BookingDetailModal } from '../../components/common/BookingDetailModal';
 import { PRIEST_MOCK_STAFF } from '../../data/priestMockData';
 import {
   formatDateKey,
@@ -102,6 +104,8 @@ export const StaffDashboardScreen: React.FC = () => {
 
   // Switch Staff Modal (for easy demonstration/testing across 5 staff members)
   const [isStaffSwitchModalVisible, setIsStaffSwitchModalVisible] = useState<boolean>(false);
+  const [selectedBooking, setSelectedBooking] = useState<ScheduleBooking | null>(null);
+  const [isDetailModalVisible, setIsDetailModalVisible] = useState<boolean>(false);
 
   /**
    * Load all staff dashboard data
@@ -204,6 +208,33 @@ export const StaffDashboardScreen: React.FC = () => {
     setLoading(true);
     await authService.setStaffSession(staffId);
     loadDashboardData(staffId);
+  };
+
+  const handleEventPress = (event: StaffAssignedEvent) => {
+    const booking: ScheduleBooking = {
+      id: event.id,
+      bookingNumber: `#BK-${event.id.replace('ev-', '').replace('today-', '')}`,
+      date: event.date,
+      timeSlot: event.timeSlot,
+      startTime: event.startTime,
+      endTime: event.endTime,
+      titleTamil: event.titleTamil,
+      titleEnglish: event.titleEnglish,
+      clientName: event.clientName,
+      clientPhone: event.clientPhone,
+      locationTamil: event.locationTamil,
+      locationEnglish: event.locationEnglish,
+      category: event.category as any,
+      categoryLabelTamil: event.categoryLabelTamil,
+      status: event.status as any,
+      statusLabelTamil: event.statusLabelTamil,
+      notes: event.notesTamil,
+      priestNameTamil: currentStaff?.nameTamil,
+      priestNameEnglish: currentStaff?.nameEnglish,
+      priestPhone: currentStaff?.phone,
+    };
+    setSelectedBooking(booking);
+    setIsDetailModalVisible(true);
   };
 
   const todayObj = parseDateKey(todayKey);
@@ -353,8 +384,9 @@ export const StaffDashboardScreen: React.FC = () => {
             const isCompleted = event.status === 'completed';
 
             return (
-              <View
+              <Pressable
                 key={event.id}
+                onPress={() => handleEventPress(event)}
                 style={[styles.eventCard, isCompleted && styles.eventCardCompleted]}
               >
                 {/* Event Top Row: Category & Time */}
@@ -403,7 +435,7 @@ export const StaffDashboardScreen: React.FC = () => {
                     </Pressable>
                   )}
                 </View>
-              </View>
+              </Pressable>
             );
           })
         )}
@@ -559,6 +591,13 @@ export const StaffDashboardScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Shared Pooja Details Modal */}
+      <BookingDetailModal
+        visible={isDetailModalVisible}
+        booking={selectedBooking}
+        onClose={() => setIsDetailModalVisible(false)}
+      />
 
       {/* 9. Bottom Navigation */}
       <StaffBottomNav activeTab="home" staffId={currentStaff?.id} />

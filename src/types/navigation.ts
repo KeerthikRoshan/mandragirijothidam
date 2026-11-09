@@ -24,6 +24,10 @@ export type RootStackParamList = {
   StaffMore: { staffId?: string } | undefined;
   // Admin Leave Management Route
   AdminLeaveManagement: undefined;
+  // Event & Audit Routes
+  UpcomingEvents: undefined;
+  CompletedEvents: undefined;
+  FinancialAudits: undefined;
 };
 
 export type AttendanceManagementScreenNavigationProp = NativeStackNavigationProp<
@@ -171,4 +175,31 @@ export type AdminLeaveManagementScreenNavigationProp = NativeStackNavigationProp
 export type AdminLeaveManagementScreenRouteProp = RouteProp<
   RootStackParamList,
   'AdminLeaveManagement'
+>;
+
+export type UpcomingEventsScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'UpcomingEvents'
+>;
+export type UpcomingEventsScreenRouteProp = RouteProp<
+  RootStackParamList,
+  'UpcomingEvents'
+>;
+
+export type CompletedEventsScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'CompletedEvents'
+>;
+export type CompletedEventsScreenRouteProp = RouteProp<
+  RootStackParamList,
+  'CompletedEvents'
+>;
+
+export type FinancialAuditsScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'FinancialAudits'
+>;
+export type FinancialAuditsScreenRouteProp = RouteProp<
+  RootStackParamList,
+  'FinancialAudits'
 >;

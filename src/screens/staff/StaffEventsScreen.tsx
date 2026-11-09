@@ -47,6 +47,9 @@ import {
 } from '../../services/eventService';
 import { StaffBottomNav } from '../../components/staff/StaffBottomNav';
 import { StaffAssignedEvent, StaffUserProfile } from '../../types/staffPortal';
+import { ScheduleBooking } from '../../types/schedule';
+import { BookingDetailModal } from '../../components/common/BookingDetailModal';
+import { getBookingDateTimes } from '../../utils/bookingRules';
 import { formatDateKey, formatTamilDisplayDate } from '../../utils/dateUtils';
 import {
   StaffEventsScreenNavigationProp,
@@ -71,6 +74,10 @@ export const StaffEventsScreen: React.FC = () => {
   const [completingEvent, setCompletingEvent] = useState<StaffAssignedEvent | null>(null);
   const [completionNotes, setCompletionNotes] = useState<string>('');
   const [isSubmittingCompletion, setIsSubmittingCompletion] = useState<boolean>(false);
+
+  // Detail view modal state
+  const [selectedBooking, setSelectedBooking] = useState<ScheduleBooking | null>(null);
+  const [isDetailModalVisible, setIsDetailModalVisible] = useState<boolean>(false);
 
   const todayKey = formatDateKey(new Date());
 
@@ -99,32 +106,107 @@ export const StaffEventsScreen: React.FC = () => {
     loadEvents(route?.params?.staffId);
   }, [route?.params?.staffId, loadEvents]);
 
+  const eventToBooking = useCallback(
+    (event: StaffAssignedEvent): ScheduleBooking => {
+      return {
+        id: event.id,
+        bookingNumber: `#BK-${event.id.replace('ev-', '').replace('today-', '')}`,
+        date: event.date,
+        timeSlot: event.timeSlot,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        titleTamil: event.titleTamil,
+        titleEnglish: event.titleEnglish,
+        clientName: event.clientName,
+        clientPhone: event.clientPhone,
+        locationTamil: event.locationTamil,
+        locationEnglish: event.locationEnglish,
+        category: event.category as any,
+        categoryLabelTamil: event.categoryLabelTamil,
+        status: event.status as any,
+        statusLabelTamil: event.statusLabelTamil,
+        notes: event.notesTamil,
+        priestNameTamil: currentStaff?.nameTamil,
+        priestNameEnglish: currentStaff?.nameEnglish,
+      };
+    },
+    [currentStaff]
+  );
+
   // Tab Filtering
   const filteredEvents = useMemo(() => {
-    return events.filter(event => {
+    const nowMs = Date.now();
+    const list = events.filter(event => {
+      const b = eventToBooking(event);
+      const { startDateTime, endDateTime } = getBookingDateTimes(b);
+      const startMs = startDateTime.getTime();
+      const endMs = endDateTime.getTime();
+      const status = (event.status || '').toLowerCase();
+
       if (activeTab === 'today') {
         return event.date === todayKey;
       }
       if (activeTab === 'upcoming') {
-        return event.date > todayKey && event.status !== 'completed' && event.status !== 'cancelled';
+        return nowMs < startMs && status !== 'completed' && status !== 'cancelled';
       }
       if (activeTab === 'completed') {
-        return event.status === 'completed';
+        return (nowMs >= endMs || status === 'completed') && status !== 'cancelled';
       }
       return true;
     });
-  }, [events, activeTab, todayKey]);
+
+    if (activeTab === 'completed') {
+      list.sort((a, b) => {
+        const timeA = getBookingDateTimes(eventToBooking(a)).endDateTime.getTime();
+        const timeB = getBookingDateTimes(eventToBooking(b)).endDateTime.getTime();
+        return timeB - timeA;
+      });
+    } else {
+      list.sort((a, b) => {
+        const timeA = getBookingDateTimes(eventToBooking(a)).startDateTime.getTime();
+        const timeB = getBookingDateTimes(eventToBooking(b)).startDateTime.getTime();
+        return timeA - timeB;
+      });
+    }
+    return list;
+  }, [events, activeTab, todayKey, eventToBooking]);
 
   // Tab Counts
   const counts = useMemo(() => {
+    const nowMs = Date.now();
+    let todayCount = 0;
+    let upcomingCount = 0;
+    let completedCount = 0;
+
+    events.forEach(event => {
+      const b = eventToBooking(event);
+      const { startDateTime, endDateTime } = getBookingDateTimes(b);
+      const startMs = startDateTime.getTime();
+      const endMs = endDateTime.getTime();
+      const status = (event.status || '').toLowerCase();
+
+      if (event.date === todayKey) {
+        todayCount++;
+      }
+      if (nowMs < startMs && status !== 'completed' && status !== 'cancelled') {
+        upcomingCount++;
+      }
+      if ((nowMs >= endMs || status === 'completed') && status !== 'cancelled') {
+        completedCount++;
+      }
+    });
+
     return {
-      today: events.filter(e => e.date === todayKey).length,
-      upcoming: events.filter(
-        e => e.date > todayKey && e.status !== 'completed' && e.status !== 'cancelled'
-      ).length,
-      completed: events.filter(e => e.status === 'completed').length,
+      today: todayCount,
+      upcoming: upcomingCount,
+      completed: completedCount,
     };
-  }, [events, todayKey]);
+  }, [events, todayKey, eventToBooking]);
+
+  const handleEventPress = (event: StaffAssignedEvent) => {
+    setSelectedBooking(eventToBooking(event));
+    setIsDetailModalVisible(true);
+  };
 
   // Completion Handlers
   const handleOpenCompleteModal = (event: StaffAssignedEvent) => {
@@ -282,8 +364,9 @@ export const StaffEventsScreen: React.FC = () => {
             const isCompleted = event.status === 'completed';
 
             return (
-              <View
+              <Pressable
                 key={event.id}
+                onPress={() => handleEventPress(event)}
                 style={[
                   styles.eventCard,
                   isCompleted && styles.eventCardCompleted,
@@ -360,7 +443,7 @@ export const StaffEventsScreen: React.FC = () => {
                     </Pressable>
                   )}
                 </View>
-              </View>
+              </Pressable>
             );
           })
         )}
@@ -430,6 +513,13 @@ export const StaffEventsScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Shared Pooja Details Modal */}
+      <BookingDetailModal
+        visible={isDetailModalVisible}
+        booking={selectedBooking}
+        onClose={() => setIsDetailModalVisible(false)}
+      />
 
       {/* 5. Bottom Navigation */}
       <StaffBottomNav activeTab="events" staffId={currentStaff?.id} />

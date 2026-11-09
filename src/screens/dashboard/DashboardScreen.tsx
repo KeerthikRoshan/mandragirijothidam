@@ -13,7 +13,7 @@
  * 7. Bottom Navigation (முகப்பு, நாள்வாரி, புரோகிதர், profile)
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -28,6 +28,7 @@ import { DashboardWelcome } from '../../components/dashboard/DashboardWelcome';
 import { PanchangamCard } from '../../components/dashboard/PanchangamCard';
 import { OverviewSection } from '../../components/dashboard/OverviewSection';
 import { TodayEventsSection } from '../../components/dashboard/TodayEventsSection';
+import { BookingDetailModal } from '../../components/dashboard/BookingDetailModal';
 import { NewBookingButton } from '../../components/dashboard/NewBookingButton';
 import {
   PoojaBookingFormModal,
@@ -43,90 +44,247 @@ import { ScheduleBooking } from '../../types/schedule';
 import { DashboardScreenNavigationProp } from '../../types/navigation';
 import { formatDateKey } from '../../utils/dateUtils';
 import { bookingApiService } from '../../services/bookingApiService';
+import {
+  buildBookingPayload,
+  classifyTodayBooking,
+  isBookingEditable,
+  sortBookingsChronologically,
+  sortTodayBookingsByStatusOrder,
+} from '../../utils/bookingRules';
 import { useTranslation } from 'react-i18next';
 
-function mapScheduleBookingToEventBookingItem(booking: ScheduleBooking): EventBookingItem {
-  const isJathagam = booking.category === 'jathagam';
+function convertMockToScheduleBooking(
+  mock: EventBookingItem,
+  todayKey: string
+): ScheduleBooking {
+  const parts = (mock.timeRange || '09:00 AM – 10:00 AM').split('–');
+  const start = parts[0]?.trim() || '09:00 AM';
+  const end = parts[1]?.trim() || '10:00 AM';
   return {
-    id: booking.id,
-    timeRange: booking.timeSlot,
-    category: booking.categoryLabelTamil || (isJathagam ? 'ஜாதகம்' : 'நிகழ்வு'),
-    categoryBg: isJathagam ? '#EFF6FF' : '#FEF3C7',
-    categoryTextColor: isJathagam ? '#1D4ED8' : '#92400E',
-    iconType: isJathagam ? 'book' : 'heart',
-    iconBg: isJathagam ? '#DBEAFE' : '#FDE68A',
-    iconColor: isJathagam ? '#1E40AF' : '#B45309',
-    titleTamil: booking.titleTamil,
-    titleEnglish: booking.titleEnglish || '',
-    customerName: booking.clientName,
-    adminOrPriestInfo: booking.priestNameTamil || 'சுவாமி',
-    location: booking.locationTamil,
-    status: booking.statusLabelTamil || 'உறுதியானது',
+    id: mock.id,
+    bookingNumber: `#BK-${mock.id.replace('event-', '')}`,
+    date: todayKey,
+    startTime: start,
+    endTime: end,
+    timeSlot: `${start} - ${end}`,
+    durationMinutes: 60,
+    titleTamil: mock.titleTamil,
+    titleEnglish: mock.titleEnglish || '',
+    clientName: mock.customerName,
+    clientPhone: '98401 23456',
+    locationTamil: mock.location || 'ஸ்ரீ மந்திரகிரி ஜோதிட பீடம்',
+    priestNameTamil: mock.adminOrPriestInfo || 'சுவாமி சுந்தரமூர்த்தி குருக்கள்',
+    category: mock.category === 'ஜாதகம்' ? 'jathagam' : 'outdoor',
+    categoryLabelTamil: mock.category,
+    status: 'confirmed',
+    statusLabelTamil: mock.status || 'உறுதியானது',
+    totalEventCharge: 5000,
+    clientAdvanceAmount: 1500,
+    clientTotalReceived: 1500,
+    clientBalanceAmount: 3500,
+    clientPaymentStatus: 'partial',
+    venueType: 'home',
   };
 }
 
 export const DashboardScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<DashboardScreenNavigationProp>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [todaySectionY, setTodaySectionY] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<DashboardTabId>('home');
   const [isRegistrationModalVisible, setIsRegistrationModalVisible] =
     useState<boolean>(false);
+  const [isDetailModalVisible, setIsDetailModalVisible] =
+    useState<boolean>(false);
+  const [selectedBooking, setSelectedBooking] =
+    useState<ScheduleBooking | null>(null);
+  const [editingBooking, setEditingBooking] =
+    useState<ScheduleBooking | null>(null);
 
   const todayKey = useMemo(() => formatDateKey(new Date()), []);
-  const [todayBookings, setTodayBookings] = useState<EventBookingItem[]>(DASHBOARD_MOCK_DATA.todayEvents.bookings);
-  const [todayCount, setTodayCount] = useState<number>(DASHBOARD_MOCK_DATA.todayEvents.count);
+  const [todayBookings, setTodayBookings] = useState<ScheduleBooking[]>(() =>
+    sortTodayBookingsByStatusOrder(
+      DASHBOARD_MOCK_DATA.todayEvents.bookings.map(m =>
+        convertMockToScheduleBooking(m, todayKey)
+      )
+    )
+  );
+  const [todayCount, setTodayCount] = useState<number>(
+    DASHBOARD_MOCK_DATA.todayEvents.bookings.length
+  );
 
   const loadTodayBookings = useCallback(async () => {
     try {
       const list = await bookingApiService.getBookingsByDate(todayKey);
       if (list && list.length > 0) {
-        setTodayBookings(list.map(mapScheduleBookingToEventBookingItem));
-        setTodayCount(list.length);
+        // Strictly filter bookings scheduled for current local date only
+        const strictlyToday = list.filter(b => b.date === todayKey);
+        // Sort in strict order: LIVE -> UPCOMING -> COMPLETED
+        const sorted = sortTodayBookingsByStatusOrder(strictlyToday);
+        setTodayBookings(sorted);
+        setTodayCount(sorted.length);
+        return;
       }
     } catch (err) {
       console.warn('⚠️ [DashboardScreen] Failed to load today bookings:', err);
     }
+    // Fallback to sample bookings for today if live database has none yet
+    const fallback = DASHBOARD_MOCK_DATA.todayEvents.bookings.map(m =>
+      convertMockToScheduleBooking(m, todayKey)
+    );
+    const sortedFallback = sortTodayBookingsByStatusOrder(fallback);
+    setTodayBookings(sortedFallback);
+    setTodayCount(sortedFallback.length);
   }, [todayKey]);
 
   useEffect(() => {
     loadTodayBookings();
   }, [loadTodayBookings]);
 
+  // Periodic refresh to keep LIVE / UPCOMING / COMPLETED classification accurate as time passes
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTodayBookings(prev => sortTodayBookingsByStatusOrder(prev));
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Dynamic Overview Stats:
+  // Strict Constraint: Today's Events === Live + Upcoming + Completed
+  // - Exclude cancelled or deleted bookings
+  // - Count unique bookings by ID only
+  const overviewCounts = useMemo(() => {
+    // Exclude cancelled / deleted
+    const valid = todayBookings.filter(b => {
+      const s = (b.status || '').toLowerCase();
+      return s !== 'cancelled' && s !== 'deleted';
+    });
+
+    // Unique by ID only
+    const seen = new Set<string>();
+    const uniqueList: ScheduleBooking[] = [];
+    for (const b of valid) {
+      const id = String(b.id);
+      if (!seen.has(id)) {
+        seen.add(id);
+        uniqueList.push(b);
+      }
+    }
+
+    const now = new Date();
+    let live = 0;
+    let upcoming = 0;
+    let completed = 0;
+
+    for (const b of uniqueList) {
+      const cat = classifyTodayBooking(b, now);
+      if (cat === 'LIVE') {
+        live++;
+      } else if (cat === 'UPCOMING') {
+        upcoming++;
+      } else {
+        completed++;
+      }
+    }
+
+    return {
+      todayTotal: uniqueList.length,
+      liveCount: live,
+      upcomingCount: upcoming,
+      completedCount: completed,
+    };
+  }, [todayBookings]);
+
   const dynamicStats: OverviewStatItem[] = useMemo(() => {
+    const isTa = (i18n.language || 'ta').startsWith('ta');
+    const { todayTotal, liveCount, upcomingCount, completedCount } = overviewCounts;
+
     return DASHBOARD_MOCK_DATA.overview.stats.map(stat => {
-      if (stat.id === '1') {
+      if (stat.id === '1' || stat.id === 'stat-today') {
         return {
           ...stat,
-          value: String(todayCount),
+          value: String(todayTotal).padStart(2, '0'),
+        };
+      }
+      if (stat.id === '2' || stat.id === 'stat-upcoming') {
+        return {
+          ...stat,
+          value: String(upcomingCount).padStart(2, '0'),
+          subtitle: isTa ? 'இன்று வரவிருப்பவை' : "Today's Upcoming",
+        };
+      }
+      if (stat.id === '3' || stat.id === 'stat-financial') {
+        return {
+          ...stat,
+          title: liveCount > 0 ? (isTa ? 'நேரலை நிகழ்வுகள்' : 'Live Events') : stat.title,
+          value: liveCount > 0 ? String(liveCount).padStart(2, '0') : stat.value,
+          subtitle: liveCount > 0 ? (isTa ? 'நடைபெறுகிறது' : 'In Progress') : stat.subtitle,
+          valueColor: liveCount > 0 ? '#16A34A' : stat.valueColor,
+        };
+      }
+      if (stat.id === '4' || stat.id === 'stat-completed') {
+        return {
+          ...stat,
+          value: String(completedCount).padStart(2, '0'),
+          subtitle: isTa ? 'இன்று முடிவுற்றவை' : "Today's Completed",
         };
       }
       return stat;
     });
-  }, [todayCount]);
+  }, [overviewCounts, i18n.language]);
 
   const handleNotificationsPress = () => {
     Alert.alert(
       t('dashboard.notificationsTitle'),
-      t('dashboard.notificationsMessage', { count: 3 }),
+      t('dashboard.notificationsMessage', { count: 3 })
     );
   };
 
   const handleViewFullPanchangam = () => {
     Alert.alert(
       t('dashboard.fullPanchangamTitle'),
-      t('dashboard.fullPanchangamMessage'),
+      t('dashboard.fullPanchangamMessage')
     );
   };
 
   const handleReportsPress = () => {
-    Alert.alert(
-      t('dashboard.reportsTitle'),
-      t('dashboard.reportsMessage'),
-    );
+    (navigation as any)?.navigate('FinancialAudits');
   };
 
   const handleStatPress = (stat: OverviewStatItem) => {
+    const id = stat.id;
+    // 1. Today's Events: Smoothly scroll directly to Today's Events section
+    if (id === 'stat-today' || id === '1') {
+      scrollViewRef.current?.scrollTo({
+        y: Math.max(0, todaySectionY - 12),
+        animated: true,
+      });
+      return;
+    }
+    // 2. Upcoming: Navigate to dedicated UpcomingEventsScreen
+    if (id === 'stat-upcoming' || id === '2') {
+      (navigation as any)?.navigate('UpcomingEvents');
+      return;
+    }
+    // 3. Financial Audits or Live Events
+    if (id === 'stat-financial' || id === 'stat-pending' || id === '3' || id === 'stat-live') {
+      if (overviewCounts.liveCount > 0) {
+        scrollViewRef.current?.scrollTo({
+          y: Math.max(0, todaySectionY - 12),
+          animated: true,
+        });
+        return;
+      }
+      (navigation as any)?.navigate('FinancialAudits');
+      return;
+    }
+    // 4. Completed: Navigate to dedicated CompletedEventsScreen
+    if (id === 'stat-completed' || id === '4') {
+      (navigation as any)?.navigate('CompletedEvents');
+      return;
+    }
     Alert.alert(stat.title, `${stat.value} ${stat.subtitle}`);
   };
 
@@ -138,83 +296,69 @@ export const DashboardScreen: React.FC = () => {
     const live = DASHBOARD_MOCK_DATA.todayEvents.liveOperation;
     Alert.alert(
       t('dashboard.liveEventTitle'),
-      `${live.title}\n${t('common.location')}: ${live.location}`,
+      `${live.title}\n${t('common.location')}: ${live.location}`
     );
   };
 
-  const handleBookingPress = (booking: EventBookingItem) => {
-    Alert.alert(
-      `${booking.titleTamil} • ${booking.titleEnglish}`,
-      `${t('common.time')}: ${booking.timeRange}\n${t('common.client')}: ${booking.customerName}\n${t('common.status')}: ${booking.status}`,
-    );
+  const handleBookingPress = (booking: ScheduleBooking) => {
+    setSelectedBooking(booking);
+    setIsDetailModalVisible(true);
+  };
+
+  const handleEditBooking = (booking: ScheduleBooking) => {
+    const check = isBookingEditable(booking);
+    if (!check.isEditable) {
+      Alert.alert(
+        t('bookingDetail.editUnavailable'),
+        check.reasonTa || check.reasonEn || t('bookingDetail.editNotice')
+      );
+      return;
+    }
+    setIsDetailModalVisible(false);
+    setEditingBooking(booking);
+    setIsRegistrationModalVisible(true);
   };
 
   const handleNewBooking = () => {
+    setEditingBooking(null);
     setIsRegistrationModalVisible(true);
   };
 
   const handleRegistrationSubmit = async (formData: NewBookingFormData) => {
     try {
-      const startTime = formData.timeSlot.split('-')[0].trim();
-      const payload = {
-        dateKey: formData.dateKey,
-        booking_date: formData.dateKey,
-        date: formData.dateKey,
-        title: formData.title,
-        clientName: formData.clientName,
-        client_name: formData.clientName,
-        phone: formData.phone,
-        client_phone: formData.phone,
-        alternatePhone: formData.alternatePhone || null,
-        alternate_phone: formData.alternatePhone || null,
-        startTime: startTime,
-        start_time: startTime,
-        durationMinutes: formData.durationMinutes,
-        duration_minutes: formData.durationMinutes,
-        timeSlot: formData.timeSlot,
-        venueType: formData.venueType,
-        venue_type: formData.venueType,
-        location: formData.location,
-        address: formData.address || null,
-        area: formData.area || null,
-        pincode: formData.pincode || null,
-        samagriBy: formData.samagriBy,
-        samagri_by: formData.samagriBy,
-        notes: formData.notes || null,
-        priestId: formData.priestId,
-        priest_id: formData.priestId,
-        priestIds: formData.priestId ? [formData.priestId] : [],
-        priest_ids: formData.priestId ? [formData.priestId] : [],
-        category: formData.category || 'outdoor',
-        category_label_tamil: formData.categoryLabelTamil,
-        totalEventCharge: formData.totalEventCharge,
-        total_event_charge: formData.totalEventCharge,
-        clientAdvanceAmount: formData.clientAdvanceAmount,
-        client_advance_amount: formData.clientAdvanceAmount,
-        clientTotalReceived: formData.clientTotalReceived,
-        client_total_received: formData.clientTotalReceived,
-        priestTotalPay: formData.priestTotalPay,
-        priest_total_pay: formData.priestTotalPay,
-        priestAdvancePaid: formData.priestAdvancePaid,
-        priest_advance_paid: formData.priestAdvancePaid,
-      };
+      const payload = buildBookingPayload(formData);
 
-      const newBooking = await bookingApiService.createBooking(payload);
-      setIsRegistrationModalVisible(false);
-      loadTodayBookings();
-      Alert.alert(
-        t('dashboard.bookingSuccessTitle'),
-        `${newBooking.titleTamil || newBooking.titleEnglish} (${formData.timeSlot})\n${t('common.client')}: ${formData.clientName}\n${t('common.location')}: ${formData.location}\n${t('common.priest')}: ${formData.priestName}`,
-        [
-          {
-            text: t('dashboard.viewScheduleBtn'),
-            onPress: () => navigation?.navigate('DailySchedule'),
-          },
-          { text: t('common.ok') },
-        ],
-      );
+      if (editingBooking) {
+        // Edit flow: Update existing booking via PUT /api/v1/bookings/:id
+        const updated = await bookingApiService.updateBooking(editingBooking.id, payload);
+        setIsRegistrationModalVisible(false);
+        setEditingBooking(null);
+        setSelectedBooking(updated);
+        await loadTodayBookings();
+        Alert.alert(
+          t('bookingDetail.updateSuccess') || 'பூஜை பதிவு புதுப்பிக்கப்பட்டது',
+          `${updated.titleTamil || updated.titleEnglish} (${formData.timeSlot})\n${t('common.client')}: ${formData.clientName}`
+        );
+      } else {
+        // Create flow: Add new booking via POST /api/v1/bookings
+        const newBooking = await bookingApiService.createBooking(payload);
+        setIsRegistrationModalVisible(false);
+        await loadTodayBookings();
+        Alert.alert(
+          t('dashboard.bookingSuccessTitle'),
+          `${newBooking.titleTamil || newBooking.titleEnglish} (${formData.timeSlot})\n${t('common.client')}: ${formData.clientName}\n${t('common.location')}: ${formData.location}\n${t('common.priest')}: ${formData.priestName}`,
+          [
+            {
+              text: t('dashboard.viewScheduleBtn'),
+              onPress: () => navigation?.navigate('DailySchedule'),
+            },
+            { text: t('common.ok') },
+          ]
+        );
+      }
     } catch (err: any) {
-      Alert.alert('பதிவு பிழை', err?.message || 'பூஜை பதிவை சேர்க்க முடியவில்லை');
+      Alert.alert('பதிவு பிழை', err?.message || 'செயல்பாட்டை முடிக்க முடியவில்லை');
+      throw err;
     }
   };
 
@@ -238,6 +382,7 @@ export const DashboardScreen: React.FC = () => {
 
       {/* Main Scrollable Content */}
       <ScrollView
+        ref={scrollViewRef}
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
@@ -269,16 +414,23 @@ export const DashboardScreen: React.FC = () => {
         />
 
         {/* SECTION 5: Today's Events */}
-        <TodayEventsSection
-          title={t('dashboard.todayEventsTitle')}
-          count={todayCount}
-          actionText={t('common.viewAll')}
-          liveOperation={DASHBOARD_MOCK_DATA.todayEvents.liveOperation}
-          bookings={todayBookings}
-          onPressViewAll={handleViewAllEvents}
-          onPressLiveOperation={handleLiveOperationPress}
-          onPressBooking={handleBookingPress}
-        />
+        <View
+          onLayout={event => {
+            const layout = event.nativeEvent.layout;
+            setTodaySectionY(layout.y);
+          }}
+        >
+          <TodayEventsSection
+            title={t('dashboard.todayEventsTitle')}
+            count={todayCount}
+            actionText={t('common.viewAll')}
+            liveOperation={DASHBOARD_MOCK_DATA.todayEvents.liveOperation}
+            bookings={todayBookings}
+            onPressViewAll={handleViewAllEvents}
+            onPressLiveOperation={handleLiveOperationPress}
+            onPressBooking={handleBookingPress}
+          />
+        </View>
       </ScrollView>
 
       {/* SECTION 6: Floating New Booking Button */}
@@ -305,10 +457,27 @@ export const DashboardScreen: React.FC = () => {
         }}
       />
 
-      {/* Shared Bottom-Up Registration Modal */}
+      {/* Booking Detail Modal */}
+      <BookingDetailModal
+        visible={isDetailModalVisible}
+        booking={selectedBooking}
+        onClose={() => {
+          setIsDetailModalVisible(false);
+          loadTodayBookings();
+        }}
+        onEdit={handleEditBooking}
+      />
+
+      {/* Shared Bottom-Up Registration / Edit Modal */}
       <PoojaBookingFormModal
         visible={isRegistrationModalVisible}
-        onClose={() => setIsRegistrationModalVisible(false)}
+        initialBooking={editingBooking || undefined}
+        editBooking={editingBooking || undefined}
+        onClose={() => {
+          setIsRegistrationModalVisible(false);
+          setEditingBooking(null);
+          loadTodayBookings();
+        }}
         onSubmit={handleRegistrationSubmit}
       />
     </View>

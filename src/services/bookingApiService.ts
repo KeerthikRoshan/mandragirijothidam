@@ -11,6 +11,10 @@ import {
   BookingPaymentTransaction,
   EventTypeItem,
   ScheduleBooking,
+  FinancialAuditSummaryData,
+  ClientReceivableItem,
+  PriestSettlementItem,
+  FinancialAuditTransactionItem,
 } from '../types/schedule';
 
 /**
@@ -33,10 +37,14 @@ export function mapBackendBooking(row: any): ScheduleBooking {
     id: String(row.id),
     bookingNumber: row.bookingNumber || row.booking_number,
     date: dateKey,
+    endDate: row.endDate || row.end_date || dateKey,
     timeSlot: row.timeSlot || row.time_slot || `${row.startTime || row.start_time} - ${row.endTime || row.end_time}`,
     startTime: row.startTime || row.start_time || '09:00 AM',
     endTime: row.endTime || row.end_time || '10:00 AM',
     durationMinutes: Number(row.durationMinutes || row.duration_minutes || 60),
+    daysOffset: Number(row.daysOffset || row.days_offset || 0),
+    startDateTime: row.startDateTime || row.start_date_time,
+    endDateTime: row.endDateTime || row.end_date_time,
     titleTamil: row.titleTamil || row.title || 'பூஜை நிகழ்வு',
     titleEnglish: row.titleEnglish || row.title || 'Pooja Event',
     eventTypeId: row.eventTypeId ? String(row.eventTypeId) : null,
@@ -266,11 +274,28 @@ export const bookingApiService = {
    * Update an existing booking.
    */
   async updateBooking(bookingId: string | number, payload: any): Promise<ScheduleBooking> {
-    const response = await apiClient.put(API_CONFIG.ENDPOINTS.BOOKINGS.UPDATE(bookingId), payload);
-    if (!response.data?.success || !response.data?.data) {
-      throw new Error(response.data?.message || 'Failed to update booking');
+    console.log(`📤 [bookingApiService.updateBooking] Outgoing Payload for ID ${bookingId}:`, JSON.stringify(payload, null, 2));
+    try {
+      const response = await apiClient.put(API_CONFIG.ENDPOINTS.BOOKINGS.UPDATE(bookingId), payload);
+      console.log(`📥 [bookingApiService.updateBooking] Response:`, response.data);
+      if (!response.data?.success || !response.data?.data) {
+        throw new Error(response.data?.message || 'Failed to update booking');
+      }
+      return mapBackendBooking(response.data.data);
+    } catch (err: any) {
+      console.error(`❌ [bookingApiService.updateBooking] API Error:`, err?.response?.data || err.message);
+      const resData = err?.response?.data;
+      if (resData?.errors && typeof resData.errors === 'object') {
+        if (resData.errors.collision) {
+          throw new Error(`${resData.message || 'Time slot conflict'}: ${resData.errors.collision}`);
+        }
+        const errorDetails = Object.entries(resData.errors)
+          .map(([field, msg]) => `• ${field}: ${msg}`)
+          .join('\n');
+        throw new Error(`${resData.message || 'Validation failed'}:\n${errorDetails}`);
+      }
+      throw new Error(resData?.message || err?.message || 'Failed to update booking');
     }
-    return mapBackendBooking(response.data.data);
   },
 
   /**
@@ -321,5 +346,98 @@ export const bookingApiService = {
       }));
     }
     return [];
+  },
+
+  /**
+   * Fetch aggregate financial audit summary and client receivables.
+   */
+  async getFinancialAuditSummary(params?: {
+    fromDate?: string;
+    toDate?: string;
+    date?: string;
+    month?: string;
+  }): Promise<{
+    summary: FinancialAuditSummaryData;
+    receivables: ClientReceivableItem[];
+    count: number;
+  }> {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.BOOKINGS.FINANCIAL_AUDITS_SUMMARY, { params });
+      if (response.data?.success && response.data?.data) {
+        return response.data.data;
+      }
+    } catch (err: any) {
+      console.warn('⚠️ [bookingApiService] getFinancialAuditSummary failed:', err?.response?.data || err.message);
+    }
+    return {
+      summary: {
+        totalBookings: 0,
+        totalBilled: 0,
+        totalCollected: 0,
+        clientOutstanding: 0,
+        priestTotalDue: 0,
+        priestSettled: 0,
+        priestPendingSettlement: 0,
+        netPeedamMargin: 0,
+        fullyPaidCount: 0,
+        partialPaidCount: 0,
+        pendingPaidCount: 0,
+        priestSettledCount: 0,
+        priestPendingCount: 0,
+      },
+      receivables: [],
+      count: 0,
+    };
+  },
+
+  /**
+   * Fetch priest compensation and pending settlement status.
+   */
+  async getPriestSettlements(params?: {
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<{
+    settlements: PriestSettlementItem[];
+    count: number;
+  }> {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.BOOKINGS.FINANCIAL_AUDITS_SETTLEMENTS, { params });
+      if (response.data?.success && response.data?.data) {
+        return response.data.data;
+      }
+    } catch (err: any) {
+      console.warn('⚠️ [bookingApiService] getPriestSettlements failed:', err?.response?.data || err.message);
+    }
+    return {
+      settlements: [],
+      count: 0,
+    };
+  },
+
+  /**
+   * Fetch unified ledger transactions for financial audit.
+   */
+  async getFinancialAuditTransactions(params?: {
+    fromDate?: string;
+    toDate?: string;
+    party?: 'client' | 'priest';
+    search?: string;
+    limit?: number;
+  }): Promise<{
+    transactions: FinancialAuditTransactionItem[];
+    count: number;
+  }> {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.BOOKINGS.FINANCIAL_AUDITS_TRANSACTIONS, { params });
+      if (response.data?.success && response.data?.data) {
+        return response.data.data;
+      }
+    } catch (err: any) {
+      console.warn('⚠️ [bookingApiService] getFinancialAuditTransactions failed:', err?.response?.data || err.message);
+    }
+    return {
+      transactions: [],
+      count: 0,
+    };
   },
 };

@@ -21,6 +21,7 @@ import { authStorage } from '../../storage/authStorage';
 import { apiClient } from '../apiClient';
 import { API_CONFIG } from '../../config/apiConfig';
 import { showToast } from '../../components/common/AppToast';
+import { deviceService } from '../deviceService';
 
 export interface LoginCredentials {
   mobileNumber: string; // 10-digit mobile number
@@ -779,6 +780,13 @@ export const authService = {
    */
   async logout(options?: { silent?: boolean; lang?: Language }): Promise<void> {
     const lang = options?.lang || 'ta';
+
+    try {
+      // 1. Unregister active device token while accessToken is still available
+      await deviceService.unregisterDevice();
+    } catch (_deviceErr) {
+      // Non-fatal if offline; local credentials must always be cleared
+    }
 
     try {
       const refreshToken = await authStorage.getRefreshToken();

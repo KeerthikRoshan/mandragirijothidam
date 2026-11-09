@@ -10,7 +10,7 @@ export type Environment = 'development' | 'test' | 'preprod' | 'production';
 
 export const ENVIRONMENTS: Record<Environment, { BASE_URL: string }> = {
   development: {
-    BASE_URL: 'http://10.216.197.141:5000',
+    BASE_URL: 'http://10.18.29.141:5000',
   },
   test: {
     BASE_URL: 'https://test-api.mandhragirijothidam.com',
@@ -71,10 +71,26 @@ export const API_CONFIG = {
       EVENT_TYPES: '/bookings/event-types',
       BY_DATE: (date: string) => `/bookings?date=${date}`,
       BY_PRIEST: (priestId: string | number) => `/bookings/priest/${priestId}`,
+      FINANCIAL_AUDITS_SUMMARY: '/bookings/financial-audits/summary',
+      FINANCIAL_AUDITS_SETTLEMENTS: '/bookings/financial-audits/settlements',
+      FINANCIAL_AUDITS_TRANSACTIONS: '/bookings/financial-audits/transactions',
       DETAILS: (id: string | number) => `/bookings/${id}`,
       UPDATE: (id: string | number) => `/bookings/${id}`,
       DELETE: (id: string | number) => `/bookings/${id}`,
       PAYMENTS: (id: string | number) => `/bookings/${id}/payments`,
+    },
+    DEVICES: {
+      REGISTER: '/devices/register',
+      UPDATE_TOKEN: '/devices/token',
+      UNREGISTER: '/devices/unregister',
+    },
+    NOTIFICATIONS: {
+      LIST: '/notifications',
+      UNREAD_COUNT: '/notifications/unread-count',
+      READ: (id: string | number) => `/notifications/${id}/read`,
+      READ_ALL: '/notifications/read-all',
+      DELETE: (id: string | number) => `/notifications/${id}`,
+      PREFERENCES: '/notifications/preferences',
     },
   },
   HEADERS: {

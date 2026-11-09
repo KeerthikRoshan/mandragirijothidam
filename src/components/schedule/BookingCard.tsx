@@ -5,44 +5,97 @@
  * Clean, simple layout with refined Tamil/English typography.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Linking,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { Clock, MapPin, Phone, User } from 'lucide-react-native';
+import { Calendar, Clock, MapPin, Phone, User } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { ScheduleBooking, BookingStatus } from '../../types/schedule';
+import { getBookingDateTimes } from '../../utils/bookingRules';
+import { BlinkingLiveDot } from '../common/BlinkingLiveDot';
 
 interface BookingCardProps {
   booking: ScheduleBooking;
   onPress?: () => void;
+  showDate?: boolean;
 }
 
-export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress }) => {
+export const BookingCard: React.FC<BookingCardProps> = ({
+  booking,
+  onPress,
+  showDate = false,
+}) => {
   const { t, i18n } = useTranslation();
   const isTa = (i18n.language || 'ta').startsWith('ta');
 
-  const getStatusStyles = (status: BookingStatus) => {
-    switch (status) {
-      case 'confirmed':
+  // Dynamic booking classification using true start and end date/time
+  const { effectiveStatus, isNextDay } = useMemo(() => {
+    const now = new Date();
+    const { startDateTime, endDateTime } = getBookingDateTimes(booking);
+    const nowMs = now.getTime();
+    const startMs = startDateTime.getTime();
+    const endMs = endDateTime.getTime();
+    const raw = (booking.status || '').toLowerCase();
+
+    const crossesMidnight =
+      endDateTime.getDate() !== startDateTime.getDate() ||
+      endDateTime.getTime() - startDateTime.getTime() >= 24 * 60 * 60 * 1000;
+
+    if (raw === 'cancelled' || raw === 'deleted') {
+      return { effectiveStatus: 'cancelled' as const, isNextDay: crossesMidnight };
+    }
+    // Completed if marked completed or current date/time has passed end time
+    if (raw === 'completed' || nowMs >= endMs) {
+      return { effectiveStatus: 'completed' as const, isNextDay: crossesMidnight };
+    }
+    // Live if currently between start and end date/time
+    if (nowMs >= startMs && nowMs < endMs) {
+      return { effectiveStatus: 'live' as const, isNextDay: crossesMidnight };
+    }
+    if (raw === 'pending') {
+      return { effectiveStatus: 'pending' as const, isNextDay: crossesMidnight };
+    }
+    return { effectiveStatus: 'upcoming' as const, isNextDay: crossesMidnight };
+  }, [booking]);
+
+  const rawStatus = (booking.status || '').toLowerCase();
+
+  const getStatusStyles = () => {
+    switch (effectiveStatus) {
+      case 'completed':
         return {
-          container: styles.statusConfirmed,
-          text: styles.statusTextConfirmed,
-          label: `✓ ${t('status.confirmed')}`,
+          container: styles.statusCompleted,
+          text: styles.statusTextCompleted,
+          label: `✓ ${t('status.completed')}`,
+          timeContainer: styles.timeSlate,
+          timeText: styles.timeTextSlate,
+          isLive: false,
+        };
+      case 'live':
+        return {
+          container: styles.statusLive,
+          text: styles.statusTextLive,
+          label: isTa ? 'நேரலை' : 'LIVE',
           timeContainer: styles.timeGreen,
           timeText: styles.timeTextGreen,
+          isLive: true,
         };
       case 'upcoming':
         return {
-          container: styles.statusUpcoming,
-          text: styles.statusTextUpcoming,
-          label: `⏱ ${t('status.upcoming')}`,
-          timeContainer: styles.timeAmber,
-          timeText: styles.timeTextAmber,
+          container: rawStatus === 'confirmed' ? styles.statusConfirmed : styles.statusUpcoming,
+          text: rawStatus === 'confirmed' ? styles.statusTextConfirmed : styles.statusTextUpcoming,
+          label: rawStatus === 'confirmed'
+            ? `✓ ${t('status.confirmed')}`
+            : `⏱ ${t('status.upcoming')}`,
+          timeContainer: rawStatus === 'confirmed' ? styles.timeGreen : styles.timeAmber,
+          timeText: rawStatus === 'confirmed' ? styles.timeTextGreen : styles.timeTextAmber,
+          isLive: false,
         };
       case 'pending':
         return {
@@ -51,27 +104,38 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress }) =>
           label: `⏱ ${t('status.pending')}`,
           timeContainer: styles.timeYellow,
           timeText: styles.timeTextYellow,
+          isLive: false,
         };
-      case 'completed':
+      case 'cancelled':
         return {
-          container: styles.statusCompleted,
-          text: styles.statusTextCompleted,
-          label: `✓ ${t('status.completed')}`,
+          container: styles.statusCancelled,
+          text: styles.statusTextCancelled,
+          label: isTa ? '✕ ரத்து' : '✕ Cancelled',
           timeContainer: styles.timeSlate,
           timeText: styles.timeTextSlate,
+          isLive: false,
         };
       default:
         return {
           container: styles.statusPending,
           text: styles.statusTextPending,
-          label: isTa ? booking.statusLabelTamil : status,
+          label: isTa ? booking.statusLabelTamil || rawStatus : rawStatus,
           timeContainer: styles.timeGreen,
           timeText: styles.timeTextGreen,
+          isLive: false,
         };
     }
   };
 
-  const statusStyle = getStatusStyles(booking.status);
+  const statusStyle = getStatusStyles();
+
+  // Clear start and end time display
+  const displayTime = useMemo(() => {
+    if (booking.startTime && booking.endTime) {
+      return `${booking.startTime} – ${booking.endTime}`;
+    }
+    return booking.timeSlot || booking.startTime || '—';
+  }, [booking.startTime, booking.endTime, booking.timeSlot]);
 
   const handleCall = () => {
     if (booking.clientPhone) {
@@ -98,20 +162,40 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPress }) =>
   return (
     <Pressable
       onPress={onPress}
-      style={styles.card}
+      style={[
+        styles.card,
+        effectiveStatus === 'live' && styles.cardLive,
+        effectiveStatus === 'completed' && styles.cardCompleted,
+      ]}
       accessibilityRole="button"
-      accessibilityLabel={`${displayTitle}, ${booking.timeSlot}, ${statusStyle.label}`}
+      accessibilityLabel={`${displayTitle}, ${displayTime}, ${statusStyle.label}`}
     >
       {/* Top Row: Time Slot Badge & Status Badge */}
       <View style={styles.topRow}>
-        <View style={[styles.timeBadge, statusStyle.timeContainer]}>
-          <Clock size={12} color={statusStyle.timeText.color} style={styles.clockIcon} />
-          <Text style={[styles.timeText, statusStyle.timeText]}>
-            {booking.timeSlot}
-          </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1, marginRight: 8 }}>
+          {showDate && Boolean(booking.date) && (
+            <View style={[styles.timeBadge, { backgroundColor: '#F1F5F9' }]}>
+              <Calendar size={11} color="#074735" style={styles.clockIcon} />
+              <Text style={[styles.timeText, { color: '#074735' }]}>
+                {booking.date}
+              </Text>
+            </View>
+          )}
+          <View style={[styles.timeBadge, statusStyle.timeContainer]}>
+            <Clock size={12} color={statusStyle.timeText.color} style={styles.clockIcon} />
+            <Text style={[styles.timeText, statusStyle.timeText]}>
+              {displayTime}
+            </Text>
+            {isNextDay && (
+              <Text style={[styles.nextDayIndicator, isTa && styles.nextDayIndicatorTamil]}>
+                {isTa ? '(அடுத்த நாள்)' : '(Next Day)'}
+              </Text>
+            )}
+          </View>
         </View>
 
-        <View style={[styles.statusBadge, statusStyle.container]}>
+        <View style={[styles.statusBadge, statusStyle.container, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+          {statusStyle.isLive && <BlinkingLiveDot size={6} color="#16A34A" />}
           <Text
             style={[
               styles.statusText,
@@ -263,6 +347,16 @@ const styles = StyleSheet.create({
     elevation: 2,
     marginBottom: 2,
   },
+  cardLive: {
+    borderColor: '#10B981',
+    borderWidth: 1.5,
+    backgroundColor: '#F0FDF4',
+  },
+  cardCompleted: {
+    borderColor: '#E2E8F0',
+    borderWidth: 1,
+    backgroundColor: '#FFFFFF',
+  },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -344,6 +438,30 @@ const styles = StyleSheet.create({
   },
   statusTextCompleted: {
     color: '#475569',
+  },
+  statusLive: {
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+  },
+  statusTextLive: {
+    color: '#15803D',
+  },
+  statusCancelled: {
+    backgroundColor: '#FEE2E2',
+  },
+  statusTextCancelled: {
+    color: '#DC2626',
+  },
+  nextDayIndicator: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#074735',
+    marginLeft: 4,
+  },
+  nextDayIndicatorTamil: {
+    fontSize: 9,
+    fontWeight: '700',
   },
   titleText: {
     fontSize: 15,

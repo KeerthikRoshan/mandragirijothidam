@@ -156,5 +156,29 @@ PermissionsAndroid.requestMultiple = jest.fn(() => Promise.resolve({}));
 // Initialize central i18n for tests
 require('./src/i18n');
 
+// Mock @react-native-firebase/messaging and @react-native-firebase/app
+jest.mock('@react-native-firebase/messaging', () => ({
+  __esModule: true,
+  getMessaging: jest.fn(() => ({})),
+  getToken: jest.fn(() => Promise.resolve('mock_fcm_token_1234567890_abcdef')),
+  onTokenRefresh: jest.fn(() => jest.fn()),
+  default: jest.fn(() => ({
+    getToken: jest.fn(() => Promise.resolve('mock_fcm_token_1234567890_abcdef')),
+    onTokenRefresh: jest.fn(() => jest.fn()),
+    requestPermission: jest.fn(() => Promise.resolve(1)),
+    hasPermission: jest.fn(() => Promise.resolve(1)),
+  })),
+}));
+
+jest.mock('@react-native-firebase/app', () => ({
+  __esModule: true,
+  getApp: jest.fn(() => ({})),
+  getApps: jest.fn(() => [{}]),
+  initializeApp: jest.fn(() => ({})),
+  default: {
+    app: jest.fn(() => ({})),
+  },
+}));
+
 
 

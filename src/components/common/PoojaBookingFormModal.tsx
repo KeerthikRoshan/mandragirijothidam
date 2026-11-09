@@ -90,6 +90,11 @@ export interface NewBookingFormData {
   samagriBy?: SamagriProvider;
   notes?: string;
   dateKey: string;
+  endDateKey?: string;
+  startDateTime?: string;
+  endDateTime?: string;
+  daysOffset?: number;
+  crossesMidnight?: boolean;
   totalEventCharge: number;
   clientAdvanceAmount: number;
   clientTotalReceived: number;
@@ -105,6 +110,8 @@ interface PoojaBookingFormModalProps {
   onSubmit: (data: NewBookingFormData) => Promise<void> | void;
   selectedDate?: string; // YYYY-MM-DD
   initialBooking?: ScheduleBooking;
+  editBooking?: ScheduleBooking;
+  initialDateKey?: string;
 }
 
 interface ModalStrings {
@@ -382,7 +389,10 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
   onSubmit,
   selectedDate,
   initialBooking,
+  editBooking,
+  initialDateKey,
 }) => {
+  const effectiveInitialBooking = initialBooking || editBooking;
   const insets = useSafeAreaInsets();
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
 
@@ -413,66 +423,70 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
   });
 
   // Form Fields State (Placeholder-only for new booking; preserved for initialBooking)
-  const initialDateString = initialBooking?.date || selectedDate || formatDateKey(new Date());
+  const initialDateString =
+    effectiveInitialBooking?.date ||
+    initialDateKey ||
+    selectedDate ||
+    formatDateKey(new Date());
   const [dateInput, setDateInput] = useState<string>(initialDateString);
   const [title, setTitle] = useState<string>(
-    initialBooking?.titleTamil || initialBooking?.titleEnglish || ''
+    effectiveInitialBooking?.titleTamil || effectiveInitialBooking?.titleEnglish || effectiveInitialBooking?.title || ''
   );
 
-  const [client, setClient] = useState<string>(initialBooking?.clientName || '');
-  const [phone, setPhone] = useState<string>(initialBooking?.clientPhone || '');
+  const [client, setClient] = useState<string>(effectiveInitialBooking?.clientName || '');
+  const [phone, setPhone] = useState<string>(effectiveInitialBooking?.clientPhone || effectiveInitialBooking?.phone || '');
   const [alternatePhone, setAlternatePhone] = useState<string>(
-    initialBooking?.alternatePhone || ''
+    effectiveInitialBooking?.alternatePhone || ''
   );
 
   // Timing State (Placeholder-only for new bookings)
-  const [startTime, setStartTime] = useState<string>(initialBooking?.startTime || '');
+  const [startTime, setStartTime] = useState<string>(effectiveInitialBooking?.startTime || '');
   const [durationMinutes, setDurationMinutes] = useState<number>(
-    initialBooking?.durationMinutes || 180
+    effectiveInitialBooking?.durationMinutes || 180
   );
   const [customDurationInput, setCustomDurationInput] = useState<string>('');
   const [isCustomDuration, setIsCustomDuration] = useState<boolean>(false);
 
   // Assigned Priest Selection State (Item 7: No arbitrary priest selected by default on new booking)
   const [selectedPriestId, setSelectedPriestId] = useState<string>(
-    initialBooking?.priestId || ''
+    effectiveInitialBooking?.priestId || ''
   );
   const [isPriestPickerOpen, setIsPriestPickerOpen] = useState<boolean>(false);
   const [customPriestText, setCustomPriestText] = useState<string>('');
 
   // Venue State
-  const [venueType, setVenueType] = useState<VenueType>(initialBooking?.venueType || 'home');
-  const [address, setAddress] = useState<string>(initialBooking?.address || '');
-  const [area, setArea] = useState<string>(initialBooking?.area || '');
-  const [pincode, setPincode] = useState<string>(initialBooking?.pincode || '');
+  const [venueType, setVenueType] = useState<VenueType>(effectiveInitialBooking?.venueType || 'home');
+  const [address, setAddress] = useState<string>(effectiveInitialBooking?.address || '');
+  const [area, setArea] = useState<string>(effectiveInitialBooking?.area || '');
+  const [pincode, setPincode] = useState<string>(effectiveInitialBooking?.pincode || '');
 
   // Additional Details State
   const [samagriBy, setSamagriBy] = useState<SamagriProvider>(
-    initialBooking?.samagriBy || 'customer'
+    effectiveInitialBooking?.samagriBy || 'customer'
   );
   const [notes, setNotes] = useState<string>(
-    initialBooking?.notes || initialBooking?.notesTamil || ''
+    effectiveInitialBooking?.notes || effectiveInitialBooking?.notesTamil || ''
   );
 
   // Payment State (Placeholder-only for new bookings)
   const [totalEventCharge, setTotalEventCharge] = useState<string>(
-    initialBooking?.totalEventCharge !== undefined
-      ? String(initialBooking.totalEventCharge)
+    effectiveInitialBooking?.totalEventCharge !== undefined
+      ? String(effectiveInitialBooking.totalEventCharge)
       : ''
   );
   const [clientAdvanceAmount, setClientAdvanceAmount] = useState<string>(
-    initialBooking?.clientAdvanceAmount !== undefined
-      ? String(initialBooking.clientAdvanceAmount)
+    effectiveInitialBooking?.clientAdvanceAmount !== undefined
+      ? String(effectiveInitialBooking.clientAdvanceAmount)
       : ''
   );
   const [priestTotalPay, setPriestTotalPay] = useState<string>(
-    initialBooking?.priestTotalPay !== undefined
-      ? String(initialBooking.priestTotalPay)
+    effectiveInitialBooking?.priestTotalPay !== undefined
+      ? String(effectiveInitialBooking.priestTotalPay)
       : ''
   );
   const [priestAdvancePaid, setPriestAdvancePaid] = useState<string>(
-    initialBooking?.priestAdvancePaid !== undefined
-      ? String(initialBooking.priestAdvancePaid)
+    effectiveInitialBooking?.priestAdvancePaid !== undefined
+      ? String(effectiveInitialBooking.priestAdvancePaid)
       : ''
   );
 
@@ -542,59 +556,63 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
 
   // Synchronize initial booking details or reset to placeholder-only fields
   const prevVisibleRef = useRef<boolean>(false);
+  const prevInitialBookingIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    if (visible && !prevVisibleRef.current) {
-      if (initialBooking) {
-        setDateInput(initialBooking.date);
-        setTitle(initialBooking.titleTamil || initialBooking.titleEnglish || '');
-        setClient(initialBooking.clientName || '');
-        setPhone(initialBooking.clientPhone || '');
-        setAlternatePhone(initialBooking.alternatePhone || '');
-        setStartTime(initialBooking.startTime || '');
-        setDurationMinutes(initialBooking.durationMinutes || 180);
-        setVenueType(initialBooking.venueType || 'home');
-        setAddress(initialBooking.address || '');
-        setArea(initialBooking.area || '');
-        setPincode(initialBooking.pincode || '');
-        setSamagriBy(initialBooking.samagriBy || 'customer');
-        setNotes(initialBooking.notes || initialBooking.notesTamil || '');
+    const isNewOpen = visible && !prevVisibleRef.current;
+    const isBookingChanged = visible && effectiveInitialBooking?.id !== prevInitialBookingIdRef.current;
+
+    if (isNewOpen || isBookingChanged) {
+      if (effectiveInitialBooking) {
+        setDateInput(effectiveInitialBooking.date);
+        setTitle(effectiveInitialBooking.titleTamil || effectiveInitialBooking.titleEnglish || effectiveInitialBooking.title || '');
+        setClient(effectiveInitialBooking.clientName || '');
+        setPhone(effectiveInitialBooking.clientPhone || effectiveInitialBooking.phone || '');
+        setAlternatePhone(effectiveInitialBooking.alternatePhone || '');
+        setStartTime(effectiveInitialBooking.startTime || '');
+        setDurationMinutes(effectiveInitialBooking.durationMinutes || 180);
+        setVenueType(effectiveInitialBooking.venueType || 'home');
+        setAddress(effectiveInitialBooking.address || '');
+        setArea(effectiveInitialBooking.area || '');
+        setPincode(effectiveInitialBooking.pincode || '');
+        setSamagriBy(effectiveInitialBooking.samagriBy || 'customer');
+        setNotes(effectiveInitialBooking.notes || effectiveInitialBooking.notesTamil || '');
 
         const matchedPriest = staffList.find(
-          p => p.id === initialBooking.priestId || p.fullTitleTamil === initialBooking.priestNameTamil
+          p => p.id === effectiveInitialBooking.priestId || p.fullTitleTamil === effectiveInitialBooking.priestNameTamil
         );
         if (matchedPriest) {
           setSelectedPriestId(matchedPriest.id);
-        } else if (initialBooking.priestId) {
-          setSelectedPriestId(initialBooking.priestId);
-        } else if (initialBooking.priestNameTamil) {
+        } else if (effectiveInitialBooking.priestId) {
+          setSelectedPriestId(effectiveInitialBooking.priestId);
+        } else if (effectiveInitialBooking.priestNameTamil) {
           setSelectedPriestId('custom');
-          setCustomPriestText(initialBooking.priestNameTamil);
+          setCustomPriestText(effectiveInitialBooking.priestNameTamil);
         } else {
           setSelectedPriestId('');
         }
 
         setTotalEventCharge(
-          initialBooking.totalEventCharge !== undefined ? String(initialBooking.totalEventCharge) : ''
+          effectiveInitialBooking.totalEventCharge !== undefined ? String(effectiveInitialBooking.totalEventCharge) : ''
         );
         setClientAdvanceAmount(
-          initialBooking.clientAdvanceAmount !== undefined ? String(initialBooking.clientAdvanceAmount) : ''
+          effectiveInitialBooking.clientAdvanceAmount !== undefined ? String(effectiveInitialBooking.clientAdvanceAmount) : ''
         );
         setPriestTotalPay(
-          initialBooking.priestTotalPay !== undefined ? String(initialBooking.priestTotalPay) : ''
+          effectiveInitialBooking.priestTotalPay !== undefined ? String(effectiveInitialBooking.priestTotalPay) : ''
         );
         setPriestAdvancePaid(
-          initialBooking.priestAdvancePaid !== undefined ? String(initialBooking.priestAdvancePaid) : ''
+          effectiveInitialBooking.priestAdvancePaid !== undefined ? String(effectiveInitialBooking.priestAdvancePaid) : ''
         );
 
-        const d = parseDateKey(initialBooking.date);
+        const d = parseDateKey(effectiveInitialBooking.date);
         if (!isNaN(d.getTime())) {
           setCalendarYear(d.getFullYear());
           setCalendarMonthIndex(d.getMonth());
         }
       } else {
         // New booking: All fields start empty so descriptive placeholders display
-        const dateDefault = selectedDate || formatDateKey(new Date());
+        const dateDefault = initialDateKey || selectedDate || formatDateKey(new Date());
         setDateInput(dateDefault);
         setTitle('');
         setClient('');
@@ -632,9 +650,10 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
       setIsPriestPickerOpen(false);
       setIsDatePickerOpen(false);
       setIsTimePickerOpen(false);
+      prevInitialBookingIdRef.current = effectiveInitialBooking?.id;
     }
     prevVisibleRef.current = visible;
-  }, [visible, selectedDate, initialBooking, staffList]);
+  }, [visible, selectedDate, initialDateKey, effectiveInitialBooking, staffList]);
 
   // Synchronize time picker whenever it opens or startTime changes
   useEffect(() => {
@@ -684,11 +703,11 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
   const calculatedTimings = useMemo(() => {
     if (!startTime.trim()) return null;
     try {
-      return calculateBookingTimings(startTime, currentDuration);
+      return calculateBookingTimings(startTime, currentDuration, normalizedDateKey);
     } catch {
       return null;
     }
-  }, [startTime, currentDuration]);
+  }, [startTime, currentDuration, normalizedDateKey]);
 
   // Active Priest (Item 7: Returns null if no priest is selected yet)
   const activePriest = useMemo(() => {
@@ -707,20 +726,20 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
     const found = staffList.find(p => p.id === selectedPriestId || p.fullTitleTamil === selectedPriestId);
     if (found) return found;
 
-    // Fallback to initialBooking assigned priest details
-    if (initialBooking && (initialBooking.priestId === selectedPriestId || initialBooking.priestNameTamil)) {
+    // Fallback to effectiveInitialBooking assigned priest details
+    if (effectiveInitialBooking && (effectiveInitialBooking.priestId === selectedPriestId || effectiveInitialBooking.priestNameTamil)) {
       return {
         id: selectedPriestId,
-        nameTamil: initialBooking.priestNameTamil || selectedPriestId,
-        nameEnglish: initialBooking.priestNameEnglish || selectedPriestId,
-        fullTitleTamil: initialBooking.priestNameTamil || selectedPriestId,
+        nameTamil: effectiveInitialBooking.priestNameTamil || selectedPriestId,
+        nameEnglish: effectiveInitialBooking.priestNameEnglish || selectedPriestId,
+        fullTitleTamil: effectiveInitialBooking.priestNameTamil || selectedPriestId,
         designationTamil: 'புரோகிதர்',
         designation: 'Priest',
-        phone: initialBooking.priestPhone || '',
+        phone: effectiveInitialBooking.priestPhone || '',
       };
     }
     return null;
-  }, [selectedPriestId, customPriestText, staffList, isTa, initialBooking]);
+  }, [selectedPriestId, customPriestText, staffList, isTa, effectiveInitialBooking]);
 
   // Live Conflict Checking
   useEffect(() => {
@@ -746,7 +765,7 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
           start_time: startTime,
           duration_minutes: currentDuration,
           priest_ids: [selectedPriestId],
-          exclude_booking_id: initialBooking?.id ? parseInt(initialBooking.id, 10) || null : null,
+          exclude_booking_id: effectiveInitialBooking?.id ? parseInt(String(effectiveInitialBooking.id), 10) || null : null,
         });
 
         if (!isMounted) return;
@@ -776,7 +795,7 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
     isDatePatternValid,
     calculatedTimings,
     visible,
-    initialBooking,
+    effectiveInitialBooking,
   ]);
 
   // Numeric currency parsing
@@ -813,12 +832,36 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
         setErrorText(strings.errEventType);
         return false;
       }
+      if (title.trim().length < 2) {
+        setErrorText(
+          currentLang === 'ta'
+            ? 'பூஜை வகை / தலைப்பு குறைந்தபட்சம் 2 எழுத்துக்கள் இருக்க வேண்டும்'
+            : 'Pooja title must be at least 2 characters'
+        );
+        return false;
+      }
+      if (title.trim().length > 150) {
+        setErrorText(
+          currentLang === 'ta'
+            ? 'பூஜை வகை / தலைப்பு அதிகபட்சம் 150 எழுத்துக்கள் மட்டுமே அனுமதிக்கப்படும்'
+            : 'Pooja title cannot exceed 150 characters'
+        );
+        return false;
+      }
       if (!isDatePatternValid) {
         setErrorText(strings.errDate);
         return false;
       }
       if (!startTime.trim() || !calculatedTimings) {
         setErrorText(strings.errTime);
+        return false;
+      }
+      if (!calculatedTimings.isEndAfterStart) {
+        setErrorText(
+          currentLang === 'ta'
+            ? 'முடிவு நேரம் துவக்க நேரத்திற்குப் பின் இருக்க வேண்டும்.'
+            : 'End date and time must be strictly after start date and time.'
+        );
         return false;
       }
       if (!selectedPriestId) {
@@ -841,18 +884,86 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
         setErrorText(strings.errCustomerName);
         return false;
       }
-      if (!phone.trim() || phone.trim().length < 7) {
+      if (client.trim().length < 2) {
+        setErrorText(
+          currentLang === 'ta'
+            ? 'கர்த்தா / பக்தர் பெயர் குறைந்தபட்சம் 2 எழுத்துக்கள் இருக்க வேண்டும்'
+            : 'Customer name must be at least 2 characters'
+        );
+        return false;
+      }
+      if (client.trim().length > 100) {
+        setErrorText(
+          currentLang === 'ta'
+            ? 'கர்த்தா / பக்தர் பெயர் 100 எழுத்துக்களுக்கு மிகாமல் இருக்க வேண்டும்'
+            : 'Customer name cannot exceed 100 characters'
+        );
+        return false;
+      }
+      if (!phone.trim()) {
         setErrorText(strings.errMobile);
         return false;
+      }
+      const cleanPhone = phone.replace(/[^0-9]/g, '');
+      if (cleanPhone.length < 10 || cleanPhone.length > 15) {
+        setErrorText(
+          currentLang === 'ta'
+            ? 'சரியான அலைபேசி எண்ணை உள்ளிடவும் (10-15 இலக்கங்கள்)'
+            : 'Please enter a valid mobile number (10-15 digits)'
+        );
+        return false;
+      }
+      if (alternatePhone.trim()) {
+        const cleanAlt = alternatePhone.replace(/[^0-9]/g, '');
+        if (cleanAlt.length < 7 || cleanAlt.length > 15) {
+          setErrorText(
+            currentLang === 'ta'
+              ? 'மாற்று அலைபேசி எண் 7 முதல் 15 இலக்கங்கள் இருக்க வேண்டும்'
+              : 'Alternate phone must be between 7 and 15 digits'
+          );
+          return false;
+        }
       }
       return true;
     }
 
     if (stepNumber === 3) {
+      if (address.trim().length > 255) {
+        setErrorText(
+          currentLang === 'ta'
+            ? 'முகவரி 255 எழுத்துக்களுக்கு மிகாமல் இருக்க வேண்டும்'
+            : 'Address cannot exceed 255 characters'
+        );
+        return false;
+      }
+      if (area.trim().length > 150) {
+        setErrorText(
+          currentLang === 'ta'
+            ? 'பகுதி 150 எழுத்துக்களுக்கு மிகாமல் இருக்க வேண்டும்'
+            : 'Area cannot exceed 150 characters'
+        );
+        return false;
+      }
+      if (pincode.trim() && !/^\d{6}$/.test(pincode.trim())) {
+        setErrorText(
+          currentLang === 'ta'
+            ? 'அஞ்சல் குறியீடு 6 இலக்கங்கள் இருக்க வேண்டும்'
+            : 'Pincode must be a valid 6-digit number'
+        );
+        return false;
+      }
       return true;
     }
 
     if (stepNumber === 4) {
+      if (notes.trim().length > 500) {
+        setErrorText(
+          currentLang === 'ta'
+            ? 'குறிப்புகள் 500 எழுத்துக்களுக்கு மிகாமல் இருக்க வேண்டும்'
+            : 'Notes cannot exceed 500 characters'
+        );
+        return false;
+      }
       return true;
     }
 
@@ -938,7 +1049,17 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
     }
     // Validate Step 2
     if (!validateStep(2)) {
-      transitionToStep(2, 'back', true);
+      transitionToStep(2, currentStep > 2 ? 'back' : 'next', true);
+      return;
+    }
+    // Validate Step 3
+    if (!validateStep(3)) {
+      transitionToStep(3, currentStep > 3 ? 'back' : 'next', true);
+      return;
+    }
+    // Validate Step 4
+    if (!validateStep(4)) {
+      transitionToStep(4, currentStep > 4 ? 'back' : 'next', true);
       return;
     }
     // Validate Step 5
@@ -952,9 +1073,14 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
         ? customPriestText.trim()
         : activePriest?.fullTitleTamil || activePriest?.nameTamil || '';
 
+    const category = effectiveInitialBooking?.category || 'temple';
+    const categoryLabelTamil =
+      effectiveInitialBooking?.categoryLabelTamil ||
+      (category === 'temple' ? 'கோவில்' : category === 'jathagam' ? 'ஜாதகம்' : 'வெளி நிகழ்வு');
+
     const payload: NewBookingFormData = {
       title: title.trim(),
-      eventTypeId: undefined,
+      eventTypeId: effectiveInitialBooking?.eventTypeId || undefined,
       clientName: client.trim(),
       phone: phone.trim(),
       alternatePhone: alternatePhone.trim() || undefined,
@@ -963,10 +1089,12 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
       address: address.trim() || undefined,
       area: area.trim() || undefined,
       pincode: pincode.trim() || undefined,
-      category: 'temple',
-      categoryLabelTamil: 'கோவில்',
+      category,
+      categoryLabelTamil,
       startTime: calculatedTimings?.startTime12 || startTime,
-      endTime: calculatedTimings?.endTime12 || '08:30 PM',
+      endTime: calculatedTimings?.crossesMidnight
+        ? `${calculatedTimings.endTime12} ${calculatedTimings.dayLabel}`
+        : calculatedTimings?.endTime12 || '08:30 PM',
       durationMinutes: currentDuration,
       timeSlot: calculatedTimings?.timeSlot || `${startTime} - ${calculatedTimings?.endTime12 || '08:30 PM'}`,
       priestId: selectedPriestId,
@@ -976,9 +1104,17 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
       samagriBy,
       notes: notes.trim() || undefined,
       dateKey: normalizedDateKey,
+      endDateKey: calculatedTimings?.endDateKey || normalizedDateKey,
+      startDateTime: calculatedTimings?.startDateTimeISO,
+      endDateTime: calculatedTimings?.endDateTimeISO,
+      daysOffset: calculatedTimings?.daysOffset || 0,
+      crossesMidnight: calculatedTimings?.crossesMidnight || false,
       totalEventCharge: totalChargeNum,
       clientAdvanceAmount: clientAdvanceNum,
-      clientTotalReceived: clientAdvanceNum,
+      clientTotalReceived:
+        effectiveInitialBooking?.clientTotalReceived !== undefined
+          ? effectiveInitialBooking.clientTotalReceived
+          : clientAdvanceNum,
       clientBalanceAmount: clientBalanceNum,
       priestTotalPay: priestPayNum,
       priestAdvancePaid: priestAdvanceNum,
@@ -988,7 +1124,7 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
     setIsSubmitting(true);
     try {
       await onSubmit(payload);
-      if (!initialBooking) {
+      if (!effectiveInitialBooking) {
         setTitle('');
         setClient('');
         setPhone('');
@@ -1107,10 +1243,14 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
 
               <View style={styles.headerTitleCol}>
                 <Text style={[styles.headerTitleText, isTa && styles.headerTitleTextTamil]}>
-                  {strings.title}
+                  {effectiveInitialBooking
+                    ? (isTa ? 'பூஜை விவரங்களை மாற்றவும்' : 'Edit Booking')
+                    : strings.title}
                 </Text>
                 <Text style={[styles.headerSubtitleText, isTa && styles.headerSubtitleTextTamil]}>
-                  {strings.subtitle}
+                  {effectiveInitialBooking
+                    ? (isTa ? 'விவரங்களை திருத்தவும்' : 'Update Pooja / Event Details')
+                    : strings.subtitle}
                 </Text>
               </View>
 
@@ -1255,6 +1395,7 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
                           style={[styles.textInput, isTa && styles.textInputTamil]}
                           value={title}
                           onChangeText={setTitle}
+                          maxLength={150}
                           placeholder={strings.eventTypePlaceholder}
                           placeholderTextColor="#94A3B8"
                           returnKeyType="next"
@@ -1379,6 +1520,7 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
                               style={[styles.textInput, { flex: 1 }]}
                               value={customDurationInput}
                               onChangeText={setCustomDurationInput}
+                              maxLength={4}
                               placeholder={isTa ? 'நிமிடங்கள் (எ.கா. 90)' : 'Minutes (e.g. 90)'}
                               placeholderTextColor="#94A3B8"
                               keyboardType="number-pad"
@@ -1397,14 +1539,33 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
                               {strings.endTimeAuto}
                             </Text>
                             <Text style={styles.endTimeFormula}>
-                              {startTime ? `${startTime} + ${durationHoursValue}h` : `-- + ${durationHoursValue}h`}
+                              {startTime
+                                ? `${startTime} + ${durationHoursValue}h${
+                                    calculatedTimings && calculatedTimings.daysOffset > 0
+                                      ? ` • ${isTa ? calculatedTimings.dayLabelTamil : calculatedTimings.dayLabel}`
+                                      : ''
+                                  }`
+                                : `-- + ${durationHoursValue}h`}
                             </Text>
                           </View>
                         </View>
                         <View style={styles.endTimeRight}>
-                          <Text style={styles.endTimeValue}>
-                            {calculatedTimings?.endTime12 || '--:--'}
-                          </Text>
+                          <View style={styles.endTimeValueCol}>
+                            <View style={styles.endTimeValueRow}>
+                              <Text style={styles.endTimeValue}>
+                                {calculatedTimings?.endTime12 || '--:--'}
+                              </Text>
+                              {calculatedTimings && calculatedTimings.daysOffset > 0 && (
+                                <View style={styles.nextDayBadge}>
+                                  <Text style={styles.nextDayBadgeText}>
+                                    {isTa
+                                      ? calculatedTimings.nextDayBadgeTamil
+                                      : calculatedTimings.nextDayBadge}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                          </View>
                           <View style={styles.autoBadge}>
                             <Text style={styles.autoBadgeText}>AUTO</Text>
                           </View>
@@ -1490,6 +1651,7 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
                           style={[styles.textInput, isTa && styles.textInputTamil]}
                           value={client}
                           onChangeText={setClient}
+                          maxLength={100}
                           placeholder={strings.customerNamePlaceholder}
                           placeholderTextColor="#94A3B8"
                           returnKeyType="next"
@@ -1508,6 +1670,7 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
                             style={[styles.textInput, isTa && styles.textInputTamil]}
                             value={phone}
                             onChangeText={setPhone}
+                            maxLength={15}
                             placeholder="+91 98401 22334"
                             placeholderTextColor="#94A3B8"
                             keyboardType="phone-pad"
@@ -1523,6 +1686,7 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
                             style={[styles.textInput, isTa && styles.textInputTamil]}
                             value={alternatePhone}
                             onChangeText={setAlternatePhone}
+                            maxLength={15}
                             placeholder="+91..."
                             placeholderTextColor="#94A3B8"
                             keyboardType="phone-pad"
@@ -1687,6 +1851,7 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
                           style={[styles.textInput, styles.multilineInput, isTa && styles.textInputTamil]}
                           value={address}
                           onChangeText={setAddress}
+                          maxLength={255}
                           placeholder={strings.addressPlaceholder}
                           placeholderTextColor="#94A3B8"
                           multiline
@@ -1706,6 +1871,7 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
                             style={[styles.textInput, isTa && styles.textInputTamil]}
                             value={area}
                             onChangeText={setArea}
+                            maxLength={150}
                             placeholder={strings.areaPlaceholder}
                             placeholderTextColor="#94A3B8"
                             onFocus={() => handleFieldFocus(220)}
@@ -1719,6 +1885,7 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
                             style={[styles.textInput, isTa && styles.textInputTamil]}
                             value={pincode}
                             onChangeText={setPincode}
+                            maxLength={6}
                             placeholder={strings.pincodePlaceholder}
                             placeholderTextColor="#94A3B8"
                             keyboardType="number-pad"
@@ -1810,6 +1977,7 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
                           style={[styles.textInput, styles.multilineInputNotes, isTa && styles.textInputTamil]}
                           value={notes}
                           onChangeText={setNotes}
+                          maxLength={500}
                           placeholder={strings.notesPlaceholder}
                           placeholderTextColor="#94A3B8"
                           multiline
@@ -1849,6 +2017,7 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
                               style={styles.currencyTextInput}
                               value={totalEventCharge}
                               onChangeText={setTotalEventCharge}
+                              maxLength={10}
                               placeholder="10000"
                               placeholderTextColor="#94A3B8"
                               keyboardType="number-pad"
@@ -1869,6 +2038,7 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
                               style={[styles.currencyTextInput, { color: '#059669' }]}
                               value={clientAdvanceAmount}
                               onChangeText={setClientAdvanceAmount}
+                              maxLength={10}
                               placeholder="1000"
                               placeholderTextColor="#94A3B8"
                               keyboardType="number-pad"
@@ -1924,6 +2094,7 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
                               style={styles.currencyTextInput}
                               value={priestTotalPay}
                               onChangeText={setPriestTotalPay}
+                              maxLength={10}
                               placeholder="2500"
                               placeholderTextColor="#94A3B8"
                               keyboardType="number-pad"
@@ -1944,6 +2115,7 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
                               style={styles.currencyTextInput}
                               value={priestAdvancePaid}
                               onChangeText={setPriestAdvancePaid}
+                              maxLength={10}
                               placeholder="500"
                               placeholderTextColor="#94A3B8"
                               keyboardType="number-pad"
@@ -1995,14 +2167,16 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
                 </Text>
               </Pressable>
 
-              {/* Right Action Button (Next on Steps 1-4 / Confirm Booking on Step 5) */}
+              {/* Right Action Button (Next on Steps 1-4 / Confirm Booking or Save on Step 5) */}
               <Pressable
                 onPress={currentStep === 5 ? handleSubmit : handleNext}
-                style={styles.bottomPrimaryBtn}
+                style={[styles.bottomPrimaryBtn, isSubmitting && { opacity: 0.6 }]}
                 disabled={isSubmitting}
                 accessibilityRole="button"
                 accessibilityLabel={
-                  currentStep === 5 ? strings.confirmBooking : strings.next
+                  currentStep === 5
+                    ? (effectiveInitialBooking ? (isTa ? 'சேமிக்க' : 'Save Changes') : strings.confirmBooking)
+                    : strings.next
                 }
               >
                 {isSubmitting ? (
@@ -2010,7 +2184,9 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
                 ) : (
                   <>
                     <Text style={[styles.bottomPrimaryBtnText, isTa && styles.bottomPrimaryBtnTextTamil]}>
-                      {currentStep === 5 ? strings.confirmBooking : strings.next}
+                      {currentStep === 5
+                        ? (effectiveInitialBooking ? (isTa ? 'சேமிக்க' : 'Save Changes') : strings.confirmBooking)
+                        : strings.next}
                     </Text>
                     <ArrowRight size={18} color="#FFFFFF" />
                   </>
@@ -2814,10 +2990,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  endTimeValueCol: {
+    alignItems: 'flex-end',
+  },
+  endTimeValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   endTimeValue: {
     fontSize: 15,
     fontWeight: '800',
     color: '#0F172A',
+  },
+  nextDayBadge: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+  },
+  nextDayBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#B45309',
   },
   autoBadge: {
     backgroundColor: '#F1F5F9',

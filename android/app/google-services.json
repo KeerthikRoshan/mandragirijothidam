@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "835907768116",
+    "project_id": "mandhiragiri-jothidam",
+    "storage_bucket": "mandhiragiri-jothidam.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:835907768116:android:19fc466d43c9d0571a9f61",
+        "android_client_info": {
+          "package_name": "com.mandhragirijothidam"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBIogTVQ-OH9eK8j3Fs6EXlcBm4Fwn9oOg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

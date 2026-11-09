@@ -1,9 +1,14 @@
 import React from 'react';
-import { Text } from 'react-native';
+import { Text, Pressable } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { DashboardScreen } from '../src/screens/dashboard/DashboardScreen';
+import { bookingApiService } from '../src/services/bookingApiService';
+import { formatDateKey } from '../src/utils/dateUtils';
+import { TodayBookingCard } from '../src/components/dashboard/TodayBookingCard';
+import { BookingDetailModal } from '../src/components/dashboard/BookingDetailModal';
+import { ScheduleBooking } from '../src/types/schedule';
 
 const initialMetrics = {
   insets: { top: 44, left: 0, right: 0, bottom: 34 },
@@ -19,15 +24,51 @@ const extractText = (node: any): string => {
 };
 
 describe('DashboardScreen Component', () => {
-  it('renders all sections and Tamil text matching the updated reference screenshot', async () => {
+  const todayKey = formatDateKey(new Date());
+
+  const mockBooking: ScheduleBooking = {
+    id: 'b-today-1',
+    bookingNumber: 'BK-TODAY-001',
+    date: todayKey,
+    startTime: '09:00 AM',
+    endTime: '10:00 AM',
+    timeSlot: '09:00 AM - 10:00 AM',
+    durationMinutes: 60,
+    titleTamil: 'கணபதி ஹோமம்',
+    titleEnglish: 'Ganapathi Homam',
+    clientName: 'ரமேஷ்',
+    clientPhone: '9840123456',
+    locationTamil: 'சென்னை',
+    priestNameTamil: 'சுவாமி முருகன்',
+    category: 'temple',
+    categoryLabelTamil: 'கோவில்',
+    status: 'confirmed',
+    statusLabelTamil: 'உறுதி செய்யப்பட்டது',
+    totalEventCharge: 5000,
+    clientAdvanceAmount: 2000,
+    clientTotalReceived: 2000,
+    clientBalanceAmount: 3000,
+    clientPaymentStatus: 'partial',
+    venueType: 'home',
+  };
+
+  beforeEach(() => {
+    jest.spyOn(bookingApiService, 'getBookingsByDate').mockResolvedValue([mockBooking]);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('renders all sections and today events matching the updated reference design', async () => {
     let renderer: ReactTestRenderer.ReactTestRenderer;
-    await ReactTestRenderer.act(() => {
+    await ReactTestRenderer.act(async () => {
       renderer = ReactTestRenderer.create(
         <SafeAreaProvider initialMetrics={initialMetrics}>
           <NavigationContainer>
             <DashboardScreen />
           </NavigationContainer>
-        </SafeAreaProvider>,
+        </SafeAreaProvider>
       );
     });
 
@@ -44,31 +85,15 @@ describe('DashboardScreen Component', () => {
     expect(texts).toContain('இன்றைய');
     expect(texts).toContain('பஞ்சாங்கம்');
     expect(texts).toContain('சுக்கில துவாதசி');
-    expect(texts).toContain('உத்திரம்');
-    expect(texts).toContain('09:15 – 10:15');
-    expect(texts).toContain('07:30 – 09:00');
-    expect(texts).toContain('சுபம்');
-    expect(texts).toContain('விலக்குக');
-    expect(texts).toContain('முழு பஞ்சாங்கம் காண்க • View Full Panchangam');
 
     // Section 4: Today's Overview
     expect(texts).toContain('இன்றைய நிலை');
     expect(texts).toContain('அறிக்கைகள் ›');
-    expect(texts).toContain('08');
-    expect(texts).toContain('24');
-    expect(texts).toContain('05');
-    expect(texts).toContain('142');
 
     // Section 5: Today's Events
     expect(texts).toContain('இன்றைய நிகழ்வுகள்');
-    expect(texts).toContain('8');
-    expect(texts).toContain('காண்க');
-    expect(texts).toContain('இன்றைய நேரலை நிகழ்வுகள்');
-    expect(texts).toContain('LIVE OPERATIONS TODAY');
-    expect(texts).toContain('08:30 AM கணபதி ஹோமம்');
-    expect(texts).toContain('ஜாதக கணிப்பு • Consultation');
-    expect(texts).toContain('திருமண பூஜை • Marriage Pooja');
-    expect(texts).toContain('உறுதியானது');
+    expect(texts.some(t => t.includes('கணபதி ஹோமம்') || t.includes('Ganapathi Homam'))).toBe(true);
+    expect(texts.some(t => t.includes('ரமேஷ்'))).toBe(true);
 
     // Section 6: Floating Action Button
     expect(texts).toContain('பூஜை பதிவு');
@@ -79,5 +104,42 @@ describe('DashboardScreen Component', () => {
     expect(texts).toContain('நாள்வாரி');
     expect(texts).toContain('புரோகிதர்');
     expect(texts).toContain('அமைப்புகள்');
+
+    await ReactTestRenderer.act(async () => {
+      renderer.unmount();
+    });
+  });
+
+  it('opens BookingDetailModal when a booking card in Today Events is tapped', async () => {
+    let renderer!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      renderer = ReactTestRenderer.create(
+        <SafeAreaProvider initialMetrics={initialMetrics}>
+          <NavigationContainer>
+            <DashboardScreen />
+          </NavigationContainer>
+        </SafeAreaProvider>
+      );
+    });
+
+    const root = renderer.root;
+
+    // Find TodayBookingCard component directly
+    const bookingCards = root.findAllByType(TodayBookingCard);
+    expect(bookingCards.length).toBeGreaterThan(0);
+
+    // Tap the booking card
+    await ReactTestRenderer.act(async () => {
+      bookingCards[0].props.onPress();
+    });
+
+    const modal = root.findByType(BookingDetailModal);
+    expect(modal.props.visible).toBe(true);
+    expect(modal.props.booking).toBeTruthy();
+    expect(modal.props.booking.clientName).toBe('ரமேஷ்');
+
+    await ReactTestRenderer.act(async () => {
+      renderer.unmount();
+    });
   });
 });
