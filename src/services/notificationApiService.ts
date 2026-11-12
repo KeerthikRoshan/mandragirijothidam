@@ -18,7 +18,21 @@ export const notificationApiService = {
    * Fetch paginated list of notifications for the authenticated user
    */
   async getNotifications(params?: NotificationListParams): Promise<NotificationListResponse> {
-    const response = await apiClient.get(API_CONFIG.ENDPOINTS.NOTIFICATIONS.LIST, { params });
+    const queryParams: Record<string, any> = {};
+
+    if (params) {
+      if (params.page !== undefined) queryParams.page = params.page;
+      if (params.limit !== undefined) queryParams.limit = params.limit;
+      if (params.unreadOnly === true) queryParams.unreadOnly = true;
+      if (params.eventType) queryParams.eventType = params.eventType;
+      if (params.startDate) queryParams.startDate = params.startDate;
+      if (params.endDate) queryParams.endDate = params.endDate;
+      if (params.lang) queryParams.lang = params.lang;
+    }
+
+    const response = await apiClient.get(API_CONFIG.ENDPOINTS.NOTIFICATIONS.LIST, {
+      params: queryParams,
+    });
     const data = response.data?.data;
     return {
       notifications: data?.notifications || [],

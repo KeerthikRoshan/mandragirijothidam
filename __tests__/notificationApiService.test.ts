@@ -53,6 +53,21 @@ describe('notificationApiService (Phase 2 Notification System)', () => {
       expect(result.pagination).toEqual(mockPagination);
     });
 
+    it('omits unreadOnly from query parameters when false to prevent string false serialization', async () => {
+      const getSpy = jest.spyOn(apiClient, 'get').mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: { notifications: [], pagination: {} },
+        },
+      });
+
+      await notificationApiService.getNotifications({ page: 1, limit: 10, unreadOnly: false });
+
+      expect(getSpy).toHaveBeenCalledWith(API_CONFIG.ENDPOINTS.NOTIFICATIONS.LIST, {
+        params: { page: 1, limit: 10 },
+      });
+    });
+
     it('provides fallback defaults if API response data is empty or missing', async () => {
       jest.spyOn(apiClient, 'get').mockResolvedValueOnce({
         data: { success: true, data: null },

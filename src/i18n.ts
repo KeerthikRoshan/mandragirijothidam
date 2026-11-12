@@ -15,7 +15,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ta from './locales/ta/translation.json';
 import en from './locales/en/translation.json';
 
-export const APP_LANGUAGE_KEY = 'user_selected_language';
+export const APP_LANGUAGE_KEY = '@mandragiri_app_lang';
+export const LEGACY_LANGUAGE_KEY = 'user_selected_language';
 export type SupportedLanguage = 'ta' | 'en';
 
 export const resources = {
@@ -41,7 +42,9 @@ i18n.use(initReactI18next).init({
 // Restore saved language preference asynchronously on app launch
 export const loadSavedLanguage = async (): Promise<SupportedLanguage> => {
   try {
-    const saved = await AsyncStorage.getItem(APP_LANGUAGE_KEY);
+    const saved =
+      (await AsyncStorage.getItem(APP_LANGUAGE_KEY)) ||
+      (await AsyncStorage.getItem(LEGACY_LANGUAGE_KEY));
     if (saved === 'ta' || saved === 'en') {
       if (i18n.language !== saved) {
         await i18n.changeLanguage(saved);
@@ -63,7 +66,10 @@ loadSavedLanguage().catch(() => {});
 export const setAppLanguage = async (lang: SupportedLanguage): Promise<void> => {
   await i18n.changeLanguage(lang);
   try {
-    await AsyncStorage.setItem(APP_LANGUAGE_KEY, lang);
+    await Promise.all([
+      AsyncStorage.setItem(APP_LANGUAGE_KEY, lang),
+      AsyncStorage.setItem(LEGACY_LANGUAGE_KEY, lang),
+    ]);
   } catch {
     // Non-fatal if storage fails
   }

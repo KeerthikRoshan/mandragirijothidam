@@ -649,5 +649,43 @@
     "received": "Received",
     "balance": "Balance",
     "totalCharge": "Total Charge"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "subtitle": "Temple Announcements & Updates",
+    "markAllAsRead": "Mark All Read",
+    "markAllConfirmTitle": "Mark all as read?",
+    "markAllConfirmMessage": "Are you sure you want to mark all notifications as read?",
+    "filterAll": "All",
+    "filterUnread": "Unread",
+    "emptyAllTitle": "No Notifications Yet",
+    "emptyAllSubtitle": "You're all caught up! Updates regarding poojas and temple operations will appear here.",
+    "emptyUnreadTitle": "No Unread Notifications",
+    "emptyUnreadSubtitle": "All of your notifications have been marked as read.",
+    "retry": "Retry",
+    "loading": "Loading notifications...",
+    "allMarkedToast": "All notifications marked as read",
+    "readAction": "Mark as read",
+    "bookingNotFound": "The booking details for this notification could not be found or have been removed.",
+    "loadingBooking": "Loading booking details...",
+    "newBadge": "NEW",
+    "justNow": "Just now",
+    "minutesAgo": "{{count}}m ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago",
+    "eventTypes": {
+      "BOOKING_CREATED": "New Pooja Booking",
+      "BOOKING_ASSIGNED": "Pooja Assigned",
+      "BOOKING_RESCHEDULED": "Pooja Rescheduled",
+      "BOOKING_CANCELLED": "Pooja Cancelled",
+      "BOOKING_REMINDER": "Event Reminder",
+      "BOOKING_COMPLETED": "Pooja Completed",
+      "LEAVE_REQUESTED": "Leave Request",
+      "LEAVE_APPROVED": "Leave Approved",
+      "LEAVE_REJECTED": "Leave Rejected",
+      "ATTENDANCE_REMINDER": "Attendance Reminder",
+      "PAYMENT_UPDATED": "Payment Recorded",
+      "SYSTEM_ANNOUNCEMENT": "Temple Announcement"
+    }
   }
 }

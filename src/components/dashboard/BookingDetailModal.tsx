@@ -22,6 +22,7 @@ import {
   Clock,
   Edit3,
   FileText,
+  HandCoins,
   IndianRupee,
   Lock,
   MapPin,
@@ -84,6 +85,11 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
   const balanceAmount = booking.clientBalanceAmount ?? Math.max(0, totalCharge - advancePaid);
   const paymentStatus = (booking.clientPaymentStatus || (advancePaid >= totalCharge && totalCharge > 0 ? 'paid' : advancePaid > 0 ? 'partial' : 'pending')).toLowerCase();
 
+  const priestTotal = booking.priestTotalPay ?? 0;
+  const priestAdvance = booking.priestAdvancePaid ?? 0;
+  const priestBalance = booking.priestBalanceAmount ?? Math.max(0, priestTotal - priestAdvance);
+  const priestStatus = (booking.priestPaymentStatus || (priestAdvance >= priestTotal && priestTotal > 0 ? 'paid' : priestAdvance > 0 ? 'partial' : 'pending')).toLowerCase();
+
   const durationHours = booking.durationMinutes
     ? Math.round((booking.durationMinutes / 60) * 10) / 10
     : 1;
@@ -134,7 +140,7 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
             <View style={styles.headerTitles}>
               <View style={styles.bookingNumberRow}>
                 <Text style={styles.bookingIdText}>
-                  {booking.bookingNumber || `#BK-${booking.id}`}
+                  {`#BK-${booking.id}`}
                 </Text>
                 {liveStatus.isLive ? (
                   <View style={styles.liveBadge}>
@@ -389,7 +395,7 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
               </View>
             </View>
 
-            {/* SECTION 4: Financials & Payment Details */}
+            {/* SECTION 4: Client Payment Details */}
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeaderRow}>
                 <View style={styles.sectionIconBg}>
@@ -401,13 +407,13 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
                     isTa && styles.tamilHeadingScale,
                   ]}
                 >
-                  {t('bookingDetail.financials')}
+                  {isTa ? 'பக்தர் கட்டண விவரம்' : 'Devotee Payment Breakdown'}
                 </Text>
               </View>
 
               <View style={styles.financialRow}>
                 <View style={styles.financialCol}>
-                  <Text style={styles.financialLabel}>
+                  <Text style={[styles.financialLabel, isTa && styles.tamilFieldLabel]}>
                     {t('bookingDetail.totalAmount')}
                   </Text>
                   <Text style={styles.financialTotalValue}>
@@ -416,7 +422,7 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
                 </View>
 
                 <View style={styles.financialCol}>
-                  <Text style={styles.financialLabel}>
+                  <Text style={[styles.financialLabel, isTa && styles.tamilFieldLabel]}>
                     {t('bookingDetail.advanceReceived')}
                   </Text>
                   <Text style={styles.financialAdvanceValue}>
@@ -425,7 +431,7 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
                 </View>
 
                 <View style={styles.financialCol}>
-                  <Text style={styles.financialLabel}>
+                  <Text style={[styles.financialLabel, isTa && styles.tamilFieldLabel]}>
                     {t('bookingDetail.balanceAmount')}
                   </Text>
                   <Text
@@ -440,7 +446,7 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
               </View>
 
               <View style={styles.paymentStatusBadgeRow}>
-                <Text style={styles.paymentStatusLabel}>
+                <Text style={[styles.paymentStatusLabel, isTa && styles.tamilFieldLabel]}>
                   {t('bookingDetail.paymentStatus')}:
                 </Text>
                 <View
@@ -461,6 +467,7 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
                         : paymentStatus === 'partial'
                         ? styles.paymentTextPartial
                         : styles.paymentTextPending,
+                      isTa && styles.tamilBadgeText,
                     ]}
                   >
                     {paymentStatus === 'paid'
@@ -474,6 +481,97 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
                       : isTa
                       ? 'நிலுவையில்'
                       : 'Payment Pending'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* SECTION 4B: Priest Settlement Details */}
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionHeaderRow}>
+                <View style={[styles.sectionIconBg, { backgroundColor: '#FDF6B2' }]}>
+                  <HandCoins size={15} color="#92400E" />
+                </View>
+                <Text
+                  style={[
+                    styles.sectionTitle,
+                    isTa && styles.tamilHeadingScale,
+                  ]}
+                >
+                  {isTa ? 'புரோகிதர் கட்டணத் தீர்வு' : 'Priest Settlement Breakdown'}
+                </Text>
+              </View>
+
+              <View style={styles.financialRow}>
+                <View style={styles.financialCol}>
+                  <Text style={[styles.financialLabel, isTa && styles.tamilFieldLabel]}>
+                    {isTa ? 'புரோகிதர் ஊதியம்' : 'Remuneration'}
+                  </Text>
+                  <Text style={styles.financialTotalValue}>
+                    ₹ {priestTotal.toLocaleString('en-IN')}
+                  </Text>
+                </View>
+
+                <View style={styles.financialCol}>
+                  <Text style={[styles.financialLabel, isTa && styles.tamilFieldLabel]}>
+                    {isTa ? 'வழங்கிய முன்பணம்' : 'Advance Paid'}
+                  </Text>
+                  <Text style={styles.financialAdvanceValue}>
+                    ₹ {priestAdvance.toLocaleString('en-IN')}
+                  </Text>
+                </View>
+
+                <View style={styles.financialCol}>
+                  <Text style={[styles.financialLabel, isTa && styles.tamilFieldLabel]}>
+                    {isTa ? 'மீதமுள்ள தீர்வு' : 'Remaining Due'}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.financialBalanceValue,
+                      priestBalance > 0 ? styles.balancePending : styles.balanceCleared,
+                    ]}
+                  >
+                    ₹ {priestBalance.toLocaleString('en-IN')}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.paymentStatusBadgeRow}>
+                <Text style={[styles.paymentStatusLabel, isTa && styles.tamilFieldLabel]}>
+                  {isTa ? 'தீர்வு நிலை' : 'Settlement Status'}:
+                </Text>
+                <View
+                  style={[
+                    styles.paymentBadge,
+                    priestStatus === 'paid'
+                      ? styles.paymentBadgePaid
+                      : priestStatus === 'partial'
+                      ? styles.paymentBadgePartial
+                      : styles.paymentBadgePending,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.paymentBadgeText,
+                      priestStatus === 'paid'
+                        ? styles.paymentTextPaid
+                        : priestStatus === 'partial'
+                        ? styles.paymentTextPartial
+                        : styles.paymentTextPending,
+                      isTa && styles.tamilBadgeText,
+                    ]}
+                  >
+                    {priestStatus === 'paid'
+                      ? isTa
+                        ? 'முழுமையாக தீர்க்கப்பட்டது'
+                        : 'Fully Settled'
+                      : priestStatus === 'partial'
+                      ? isTa
+                        ? 'பகுதி தீர்வு'
+                        : 'Partially Settled'
+                      : isTa
+                      ? 'தீர்வு நிலுவையில்'
+                      : 'Settlement Pending'}
                   </Text>
                 </View>
               </View>
@@ -627,11 +725,19 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   bookingIdText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '600',
     color: '#6B7280',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
     marginRight: 8,
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
+  },
+  tamilBadgeText: {
+    fontSize: 10.5,
+    lineHeight: 14,
   },
   liveBadge: {
     flexDirection: 'row',

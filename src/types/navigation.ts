@@ -28,6 +28,7 @@ export type RootStackParamList = {
   UpcomingEvents: undefined;
   CompletedEvents: undefined;
   FinancialAudits: undefined;
+  Notification: undefined;
 };
 
 export type AttendanceManagementScreenNavigationProp = NativeStackNavigationProp<
@@ -203,3 +204,13 @@ export type FinancialAuditsScreenRouteProp = RouteProp<
   RootStackParamList,
   'FinancialAudits'
 >;
+
+export type NotificationScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'Notification'
+>;
+export type NotificationScreenRouteProp = RouteProp<
+  RootStackParamList,
+  'Notification'
+>;
+

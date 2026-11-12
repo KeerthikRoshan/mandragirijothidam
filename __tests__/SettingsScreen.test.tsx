@@ -48,14 +48,8 @@ describe('SettingsScreen Component', () => {
 
     // 3. 3-Column Metrics Row
     expect(texts).toContain('இன்றைய பூஜை');
-    expect(texts).toContain('8');
-    expect(texts).toContain('4 முடிந்தது');
     expect(texts).toContain('ஜாதகப் பதிவுகள்');
-    expect(texts).toContain('142');
-    expect(texts).toContain('+12 இந்த வாரம்');
     expect(texts).toContain('நினைவூட்டல்');
-    expect(texts).toContain('99%');
-    expect(texts).toContain('அனுப்பப்பட்டது');
 
     // 4. Section 1: நிர்வாகம் & செயல்பாடுகள்
     expect(texts).toContain('நிர்வாகம் & செயல்பாடுகள்');
@@ -87,8 +81,8 @@ describe('SettingsScreen Component', () => {
     // 7. Verify Logout has been moved to Profile screen (not in Settings screen)
     expect(texts.some(t => t.includes('வெளியேறு'))).toBe(false);
 
-    // 8. Vedic Blessing Footer
-    expect(texts.some(t => t.includes('லோகா சமஸ்தா சுகினோ பவந்து'))).toBe(true);
+    // 8. Vedic Blessing Footer (removed per Issue 7)
+    expect(texts.some(t => t.includes('லோகா சமஸ்தா சுகினோ பவந்து'))).toBe(false);
     expect(texts.some(t => t.includes('பதிப்பு 2.4.0 (Build 2026.10)'))).toBe(true);
     expect(texts.some(t => t.includes('சரிபார்க்கப்பட்டவை'))).toBe(true);
 

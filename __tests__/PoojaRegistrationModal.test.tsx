@@ -15,34 +15,37 @@ jest.mock('../src/services/bookingApiService', () => ({
   },
 }));
 
+const mockStaffList = [
+  {
+    id: 'p-murugan',
+    nameTamil: 'முருகன் சுவாமிகள்',
+    nameEnglish: 'Murugan Swamigal',
+    fullTitleTamil: 'முருகன் சுவாமிகள் - தலைமை குருக்கள்',
+    designationTamil: 'தலைமை குருக்கள்',
+    designation: 'Chief Priest',
+    phone: '9840122334',
+    phoneDisplay: '+91 98401 22334',
+    status: 'active',
+    isLead: true,
+  },
+  {
+    id: 'p-shastri',
+    nameTamil: 'சாஸ்திரிஜி வெங்கடேஸ்வரன்',
+    nameEnglish: 'Shastriji Venkateswaran',
+    fullTitleTamil: 'சாஸ்திரிஜி வெங்கடேஸ்வரன்',
+    designationTamil: 'குருக்கள்',
+    designation: 'Priest',
+    phone: '9840122335',
+    phoneDisplay: '+91 98401 22335',
+    status: 'active',
+  },
+];
+
 jest.mock('../src/services/staffService', () => ({
   staffService: {
-    getAllStaff: jest.fn().mockReturnValue([
-      {
-        id: 'p-murugan',
-        nameTamil: 'முருகன் சுவாமிகள்',
-        nameEnglish: 'Murugan Swamigal',
-        fullTitleTamil: 'முருகன் சுவாமிகள் - தலைமை குருக்கள்',
-        designationTamil: 'தலைமை குருக்கள்',
-        designation: 'Chief Priest',
-        phone: '9840122334',
-        phoneDisplay: '+91 98401 22334',
-        status: 'active',
-        isLead: true,
-      },
-      {
-        id: 'p-shastri',
-        nameTamil: 'சாஸ்திரிஜி வெங்கடேஸ்வரன்',
-        nameEnglish: 'Shastriji Venkateswaran',
-        fullTitleTamil: 'சாஸ்திரிஜி வெங்கடேஸ்வரன்',
-        designationTamil: 'குருக்கள்',
-        designation: 'Priest',
-        phone: '9840122335',
-        phoneDisplay: '+91 98401 22335',
-        status: 'active',
-      },
-    ]),
-    fetchStaff: jest.fn().mockResolvedValue([]),
+    getAllStaff: jest.fn().mockReturnValue(mockStaffList),
+    getActiveStaff: jest.fn().mockReturnValue(mockStaffList),
+    fetchStaff: jest.fn().mockImplementation(() => Promise.resolve(mockStaffList)),
     subscribe: jest.fn().mockReturnValue(() => {}),
   },
 }));

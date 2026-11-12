@@ -104,13 +104,13 @@ export const StaffAttendanceDetailScreen: React.FC = () => {
 
   const { t } = useTranslation();
 
-  const staffId = route?.params?.staffId || 'p-murugan';
+  const staffId = route?.params?.staffId || '';
   const initialDate = route?.params?.initialDate;
 
   // Resolved staff profile with fallback to monthlyData or ID fallback
-  const mockStaff = useMemo(() => getStaffById(staffId), [staffId]);
+  const resolvedStaff = useMemo(() => (staffId ? getStaffById(staffId) : undefined), [staffId]);
   const staff = useMemo(() => {
-    if (mockStaff) return mockStaff;
+    if (resolvedStaff) return resolvedStaff;
     if (monthlyData) {
       return {
         id: monthlyData.staffId || staffId,
@@ -121,8 +121,8 @@ export const StaffAttendanceDetailScreen: React.FC = () => {
         designationTamil: monthlyData.designationTamil || 'கோவில் பணியாளர்',
         designationEnglish: monthlyData.designationEnglish || 'Temple Staff',
         roleCategory: 'priest' as const,
-        phone: '+91 98421 20110',
-        phoneDisplay: '+91 98421 20110',
+        phone: '',
+        phoneDisplay: '',
         status: 'active' as const,
       };
     }
@@ -135,11 +135,11 @@ export const StaffAttendanceDetailScreen: React.FC = () => {
       designationTamil: 'கோவில் பணியாளர்',
       designationEnglish: 'Temple Staff',
       roleCategory: 'priest' as const,
-      phone: '+91 98421 20110',
-      phoneDisplay: '+91 98421 20110',
+      phone: '',
+      phoneDisplay: '',
       status: 'active' as const,
     };
-  }, [mockStaff, monthlyData, staffId]);
+  }, [resolvedStaff, monthlyData, staffId]);
 
   // Selected viewing year and month
   const initialDateObj = initialDate ? parseDateKey(initialDate) : new Date();
@@ -235,10 +235,10 @@ export const StaffAttendanceDetailScreen: React.FC = () => {
   const totalDaysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
 
   // Metrics derived from monthly data
-  const presentCount = monthlyData?.presentCount ?? 11;
-  const absentCount = monthlyData?.absentCount ?? 1;
-  const notMarkedCount = monthlyData?.notMarkedCount ?? 18;
-  const attendancePercentage = monthlyData?.attendancePercentage ?? 92;
+  const presentCount = monthlyData?.presentCount ?? 0;
+  const absentCount = monthlyData?.absentCount ?? 0;
+  const notMarkedCount = monthlyData?.notMarkedCount ?? 0;
+  const attendancePercentage = monthlyData?.attendancePercentage ?? 0;
 
   // Selected date details
   const selectedDateObj = useMemo(() => {

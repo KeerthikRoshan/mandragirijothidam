@@ -54,6 +54,24 @@ describe('DashboardScreen Component', () => {
 
   beforeEach(() => {
     jest.spyOn(bookingApiService, 'getBookingsByDate').mockResolvedValue([mockBooking]);
+    jest.spyOn(bookingApiService, 'listBookings').mockResolvedValue([mockBooking]);
+    jest.spyOn(bookingApiService, 'getFinancialAuditSummary').mockResolvedValue({
+      summary: {
+        totalBilled: 5000,
+        totalCollected: 2000,
+        clientOutstanding: 3000,
+        priestTotalPay: 1500,
+        priestDisbursed: 500,
+        priestPending: 1000,
+        netPeedamMargin: 500,
+        totalBookings: 1,
+        settledBookings: 0,
+        pendingBookings: 1
+      },
+      receivables: [],
+      settlements: [],
+      transactions: []
+    });
   });
 
   afterEach(() => {
@@ -72,6 +90,11 @@ describe('DashboardScreen Component', () => {
       );
     });
 
+    await ReactTestRenderer.act(async () => {
+      await Promise.resolve();
+      await new Promise(r => setTimeout(r, 50));
+    });
+
     const root = renderer!.root;
     const texts = root.findAllByType(Text).map(t => extractText(t.props.children));
 
@@ -88,7 +111,7 @@ describe('DashboardScreen Component', () => {
 
     // Section 4: Today's Overview
     expect(texts).toContain('இன்றைய நிலை');
-    expect(texts).toContain('அறிக்கைகள் ›');
+    expect(texts).not.toContain('அறிக்கைகள் ›');
 
     // Section 5: Today's Events
     expect(texts).toContain('இன்றைய நிகழ்வுகள்');

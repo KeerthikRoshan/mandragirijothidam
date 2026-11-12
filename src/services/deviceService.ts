@@ -17,6 +17,7 @@ import { getMessaging, getToken } from '@react-native-firebase/messaging';
 import { apiClient } from './apiClient';
 import { API_CONFIG } from '../config/apiConfig';
 import { authStorage } from '../storage/authStorage';
+import { logFcmDiagnostic } from '../utils/fcmLogger';
 
 const STORAGE_KEYS = {
   DEVICE_ID: '@fcm_device_id',
@@ -109,6 +110,15 @@ export const deviceService = {
       // 3. Obtain user context to prevent duplicate registrations for the same user & token
       const session = await authStorage.getUserSession();
       const currentUserId = session?.userId ? String(session.userId) : 'authenticated';
+      const userRole = session?.role || 'unknown';
+
+      logFcmDiagnostic({
+        event: 'FCM_USER_CONTEXT',
+        userId: currentUserId,
+        role: userRole,
+        success: true,
+        details: { staffId: session?.staffId }
+      });
 
       const lastRegisteredRaw = await AsyncStorage.getItem(STORAGE_KEYS.LAST_REGISTERED);
       if (lastRegisteredRaw) {
@@ -128,11 +138,41 @@ export const deviceService = {
       const deviceId = await getDeviceId();
       const platform = Platform.OS === 'ios' ? 'ios' : 'android';
 
-      await apiClient.post(API_CONFIG.ENDPOINTS.DEVICES.REGISTER, {
+      logFcmDiagnostic({
+        event: 'FCM_DEVICE_REGISTER_REQUEST',
+        deviceId,
+        userId: currentUserId,
+        role: userRole,
+        maskedToken: tokenToRegister,
+        success: true,
+        details: { platform, appVersion: APP_VERSION }
+      });
+
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.DEVICES.REGISTER, {
         fcmToken: tokenToRegister,
         platform,
         deviceId,
         appVersion: APP_VERSION,
+      });
+
+      logFcmDiagnostic({
+        event: 'FCM_DEVICE_REGISTER_RESPONSE',
+        deviceId,
+        userId: currentUserId,
+        role: userRole,
+        maskedToken: tokenToRegister,
+        success: true,
+        details: { responseStatus: response.status }
+      });
+
+      logFcmDiagnostic({
+        event: 'FCM_TOKEN_LIFECYCLE',
+        deviceId,
+        userId: currentUserId,
+        role: userRole,
+        maskedToken: tokenToRegister,
+        success: true,
+        details: { action: 'activate_token' }
       });
 
       // 5. Update local state
@@ -149,6 +189,13 @@ export const deviceService = {
       console.log(`[deviceService] Device registered successfully for user ${currentUserId} with token: ${maskToken(tokenToRegister)}`);
       return { status: 'registered' };
     } catch (err: any) {
+      logFcmDiagnostic({
+        event: 'FCM_DEVICE_REGISTER_RESPONSE',
+        success: false,
+        maskedToken: tokenParam,
+        errorCode: err?.code || 'REGISTRATION_ERROR',
+        errorMessage: err?.message || 'Network error'
+      });
       console.warn('[deviceService] Device registration failed, retaining token for next launch:', err?.message || err);
       if (tokenParam) {
         await AsyncStorage.setItem(STORAGE_KEYS.PENDING_TOKEN, tokenParam).catch(() => {});
@@ -235,6 +282,14 @@ export const deviceService = {
         },
         { timeout: 3500 }
       );
+
+      logFcmDiagnostic({
+        event: 'FCM_TOKEN_LIFECYCLE',
+        deviceId,
+        maskedToken: fcmToken,
+        success: true,
+        details: { action: 'deactivate_token_logout' }
+      });
 
       await AsyncStorage.removeItem(STORAGE_KEYS.LAST_REGISTERED);
       console.log('[deviceService] Device unregistered successfully on logout');

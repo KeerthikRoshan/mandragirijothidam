@@ -61,7 +61,6 @@ import {
   getTamilDateInfo,
   isMuhurthamDate,
 } from '../../services/tamilCalendarService';
-import { PRIEST_MOCK_STAFF } from '../../data/priestMockData';
 import { staffService } from '../../services/staffService';
 import { bookingApiService } from '../../services/bookingApiService';
 import { calculateBookingTimings } from '../../utils/timeCalculation';
@@ -415,10 +414,10 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
   // Dynamic Staff List from Backend (Pre-load from cache if available)
   const [staffList, setStaffList] = useState<PriestStaffItem[]>(() => {
     try {
-      const cached = staffService.getAllStaff();
-      return cached && cached.length > 0 ? cached : PRIEST_MOCK_STAFF;
+      const cached = staffService.getActiveStaff();
+      return cached || [];
     } catch {
-      return PRIEST_MOCK_STAFF;
+      return [];
     }
   });
 
@@ -542,8 +541,8 @@ export const PoojaBookingFormModal: React.FC<PoojaBookingFormModalProps> = ({
       staffService
         .fetchStaff()
         .then(staff => {
-          if (isMounted && staff && staff.length > 0) {
-            setStaffList(staff);
+          if (isMounted) {
+            setStaffList(staff || []);
           }
         })
         .catch(() => {});

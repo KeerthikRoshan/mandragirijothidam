@@ -6,11 +6,9 @@
  * - Activation and deactivation controls for admin
  * - Staff deletion (remove/fire) with subscriber notifications
  * - Addition of newly created priests/assistants with admin-assigned passwords
- * - Synchronizes with PRIEST_MOCK_STAFF for complete backward compatibility
  */
 
 import { PriestStaffItem, PriestStatus } from '../types/priest';
-import { PRIEST_MOCK_STAFF } from '../data/priestMockData';
 import { apiClient } from './apiClient';
 import { API_CONFIG } from '../config/apiConfig';
 
@@ -45,7 +43,7 @@ export interface CreateStaffResult {
 }
 
 class StaffService {
-  private staffList: PriestStaffItem[] = [...PRIEST_MOCK_STAFF];
+  private staffList: PriestStaffItem[] = [];
   private listeners: Array<() => void> = [];
   private lastActionTimestamp = 0;
 
@@ -219,15 +217,12 @@ class StaffService {
         };
       }
 
-      // Network error / Offline dev fallback
-      const fallbackStaff = this.mapBackendStaffRecord(payload);
-      fallbackStaff.password = payload.password;
-      this.addStaff(fallbackStaff);
       return {
-        success: true,
-        data: fallbackStaff,
-        message: 'புரோகிதர் வெற்றிகரமாக சேர்க்கப்பட்டார்.',
-        isOfflineFallback: true,
+        success: false,
+        message:
+          apiError?.message ||
+          'பிணையப் பிழை. சேவையகத்தை இணைக்க முடியவில்லை (Network error: Unable to reach backend).',
+        errors: apiError,
       };
     }
   }

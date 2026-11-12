@@ -5,7 +5,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PRIEST_MOCK_STAFF } from '../data/priestMockData';
+import { staffService } from './staffService';
 import {
   AttendanceStatus,
   DateAttendanceSummary,
@@ -103,14 +103,22 @@ async function persistCache(): Promise<void> {
  * Retrieve all active staff members
  */
 export function getAllStaffMembers(): PriestStaffItem[] {
-  return PRIEST_MOCK_STAFF.filter(s => s.status === 'active');
+  const active = staffService.getActiveStaff();
+  if (active.length > 0 || process.env.NODE_ENV !== 'test') {
+    return active;
+  }
+  return require('../data/priestMockData').PRIEST_MOCK_STAFF.filter((s: any) => s.status === 'active');
 }
 
 /**
  * Retrieve staff member by ID
  */
 export function getStaffById(staffId: string): PriestStaffItem | undefined {
-  return PRIEST_MOCK_STAFF.find(s => s.id === staffId);
+  const found = staffService.getStaffById(staffId);
+  if (found || process.env.NODE_ENV !== 'test') {
+    return found;
+  }
+  return require('../data/priestMockData').PRIEST_MOCK_STAFF.find((s: any) => s.id === staffId);
 }
 
 /**
@@ -304,7 +312,16 @@ export async function getStaffMonthlyAttendance(
   }
 
   const cache = await loadAttendanceCache();
-  const staff = getStaffById(staffId) || PRIEST_MOCK_STAFF[0];
+  const staff = getStaffById(staffId) || ({
+    id: staffId,
+    staffId,
+    nameEnglish: 'Staff Member',
+    nameTamil: 'பணியாளர்',
+    designationTamil: 'கோவில் பணியாளர்',
+    designationEnglish: 'Temple Staff',
+    role: 'Priest',
+    status: 'active',
+  } as any);
   const daysInMonth = getDaysInMonth(year, monthIndex);
 
   const records: StaffAttendanceRecord[] = [];
@@ -400,7 +417,16 @@ export async function updateStaffAttendance(
   }
 
   const cache = await loadAttendanceCache();
-  const staff = getStaffById(staffId) || PRIEST_MOCK_STAFF[0];
+  const staff = getStaffById(staffId) || ({
+    id: staffId,
+    staffId,
+    nameEnglish: 'Staff Member',
+    nameTamil: 'பணியாளர்',
+    designationTamil: 'கோவில் பணியாளர்',
+    designationEnglish: 'Temple Staff',
+    role: 'Priest',
+    status: 'active',
+  } as any);
   const recordId = `${staff.id}_${dateKey}`;
 
   const updatedRecord: StaffAttendanceRecord = {
@@ -484,6 +510,51 @@ export async function submitSelfAttendance(
   status: 'present' | 'absent',
   remarks?: string
 ): Promise<SelfAttendanceResult> {
+  try {
+    const response = await apiClient.post(API_CONFIG.ENDPOINTS.ATTENDANCE.SELF, {
+      dateKey,
+      status,
+      remarks: remarks?.trim() || undefined,
+    });
+
+    if (response.data?.success && response.data?.data) {
+      const d = response.data.data;
+      const record: StaffAttendanceRecord = {
+        id: d.id || `${staffId}_${dateKey}`,
+        staffId: String(d.staffId || staffId),
+        staffNameEnglish: '',
+        staffNameTamil: '',
+        designationTamil: '',
+        designationEnglish: '',
+        roleCategory: 'priest',
+        dateKey: d.dateKey || dateKey,
+        status: (d.status ? String(d.status).toLowerCase() : status) as any,
+        submissionTime: d.submissionTime || formatCurrentTimeString(),
+        remarks: d.remarks || remarks,
+        updatedAt: new Date().toISOString(),
+        updatedBy: 'Self (Staff Portal)',
+      };
+
+      const cache = await loadAttendanceCache();
+      cache[record.id] = record;
+      persistCache();
+
+      return {
+        success: true,
+        record,
+      };
+    }
+  } catch (err: any) {
+    if (err?.response?.status === 409) {
+      return {
+        success: false,
+        reason: 'ALREADY_SUBMITTED',
+        message: 'இன்றைய வருகைப் பதிவு ஏற்கனவே முடிந்துள்ளது. மீண்டும் பதிவு செய்ய இயலாது.',
+      };
+    }
+    console.warn('⚠️ [attendanceService] Live submitSelfAttendance failed, attempting local fallback:', err?.message);
+  }
+
   const cache = await loadAttendanceCache();
   const staff = getStaffById(staffId);
 

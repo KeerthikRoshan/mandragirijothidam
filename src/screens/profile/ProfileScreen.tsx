@@ -15,8 +15,9 @@
  * 6. Full bilingual support (Tamil & English) in Vedic green, cream, and gold theme.
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -29,7 +30,9 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, CommonActions } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, CommonActions } from '@react-navigation/native';
+import { apiClient } from '../../services/apiClient';
+import { API_CONFIG } from '../../config/apiConfig';
 import {
   ArrowLeft,
   Camera,
@@ -60,7 +63,8 @@ export const ProfileScreen: React.FC = () => {
   const isTamil = (i18n.language || 'ta').startsWith('ta');
 
   // Admin Profile Details
-  const [adminId, setAdminId] = useState<string>('ADM-2026-108');
+  const [adminId, setAdminId] = useState<string>('ADM-1');
+  const [adminPhone, setAdminPhone] = useState<string>('9876543210');
   const [adminNameTamil, setAdminNameTamil] = useState<string>('சிவஸ்ரீ சுந்தரமூர்த்தி குருக்கள்');
   const [adminNameEnglish, setAdminNameEnglish] = useState<string>('Sundaramoorthy Gurukkal');
   const [adminEmail, setAdminEmail] = useState<string>('mandhragiri.jothidam@gmail.com');
@@ -74,6 +78,39 @@ export const ProfileScreen: React.FC = () => {
   // Uploaded Profile Photo (actual device image URI)
   const [uploadedImageUri, setUploadedImageUri] = useState<string | null>(null);
   const [isUploadSheetVisible, setIsUploadSheetVisible] = useState<boolean>(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState<boolean>(true);
+  const [isSavingProfile, setIsSavingProfile] = useState<boolean>(false);
+
+  // Load real admin profile from backend
+  const loadAdminProfile = useCallback(async () => {
+    try {
+      setIsLoadingProfile(true);
+      const res = await apiClient.get(API_CONFIG.ENDPOINTS.PROFILE?.ADMIN || '/admin/profile');
+      if (res.data?.success && res.data?.data) {
+        const d = res.data.data;
+        if (d.id) setAdminId(`ADM-${d.id}`);
+        if (d.phone || d.mobile) setAdminPhone(d.phone || d.mobile);
+        if (d.nameEnglish || d.name_english) setAdminNameEnglish(d.nameEnglish || d.name_english);
+        if (d.nameTamil || d.name_tamil) setAdminNameTamil(d.nameTamil || d.name_tamil);
+        if (d.email) setAdminEmail(d.email);
+        if (d.addressTamil || d.address_tamil) {
+          setAdminAddressTamil(d.addressTamil || d.address_tamil);
+          setAdminAddressEnglish(d.addressTamil || d.address_tamil);
+        }
+        if (d.avatarUrl || d.avatar_url) setUploadedImageUri(d.avatarUrl || d.avatar_url);
+      }
+    } catch (err) {
+      console.warn('⚠️ [ProfileScreen] Failed to load admin profile from API:', err);
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadAdminProfile();
+    }, [loadAdminProfile])
+  );
 
   // Edit Modal State
   const [isEditModalVisible, setIsEditModalVisible] = useState<boolean>(false);
@@ -81,6 +118,7 @@ export const ProfileScreen: React.FC = () => {
   const [draftNameTamil, setDraftNameTamil] = useState<string>(adminNameTamil);
   const [draftNameEnglish, setDraftNameEnglish] = useState<string>(adminNameEnglish);
   const [draftEmail, setDraftEmail] = useState<string>(adminEmail);
+  const [draftPhone, setDraftPhone] = useState<string>(adminPhone);
   const [draftAddress, setDraftAddress] = useState<string>(
     isTamil ? adminAddressTamil : adminAddressEnglish
   );
@@ -102,12 +140,13 @@ export const ProfileScreen: React.FC = () => {
     setDraftNameTamil(adminNameTamil);
     setDraftNameEnglish(adminNameEnglish);
     setDraftEmail(adminEmail);
+    setDraftPhone(adminPhone);
     setDraftAddress(isTamil ? adminAddressTamil : adminAddressEnglish);
     setDraftImageUri(uploadedImageUri);
     setIsEditModalVisible(true);
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     if (!draftNameTamil.trim() && !draftNameEnglish.trim()) {
       Alert.alert(
         t('common.error', 'பிழை'),
@@ -116,22 +155,58 @@ export const ProfileScreen: React.FC = () => {
       return;
     }
 
-    setAdminId(draftId.trim() || 'ADM-2026-108');
-    if (draftNameTamil.trim()) setAdminNameTamil(draftNameTamil.trim());
-    if (draftNameEnglish.trim()) setAdminNameEnglish(draftNameEnglish.trim());
-    setAdminEmail(draftEmail.trim());
-    if (isTamil) {
-      setAdminAddressTamil(draftAddress.trim());
-    } else {
-      setAdminAddressEnglish(draftAddress.trim());
+    if (draftEmail.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(draftEmail.trim())) {
+        Alert.alert(
+          t('common.error', 'பிழை'),
+          isTamil ? 'சரியான மின்னஞ்சல் முகவரியை உள்ளிடவும்.' : 'Please enter a valid email address.'
+        );
+        return;
+      }
     }
-    setUploadedImageUri(draftImageUri);
 
-    setIsEditModalVisible(false);
-    Alert.alert(
-      t('common.success', 'வெற்றி'),
-      t('profile.editSuccess', 'சுயவிவரத் தகவல்கள் வெற்றிகரமாக புதுப்பிக்கப்பட்டன.')
-    );
+    setIsSavingProfile(true);
+    try {
+      const payload: Record<string, any> = {
+        nameEnglish: draftNameEnglish.trim() || undefined,
+        nameTamil: draftNameTamil.trim() || undefined,
+        email: draftEmail.trim() || undefined,
+        phone: draftPhone.trim() || undefined,
+        addressTamil: draftAddress.trim() || undefined,
+      };
+
+      const res = await apiClient.put(API_CONFIG.ENDPOINTS.PROFILE?.ADMIN || '/admin/profile', payload);
+
+      if (draftId.trim()) setAdminId(draftId.trim());
+      if (draftNameTamil.trim()) setAdminNameTamil(draftNameTamil.trim());
+      if (draftNameEnglish.trim()) setAdminNameEnglish(draftNameEnglish.trim());
+      setAdminEmail(draftEmail.trim());
+      if (draftPhone.trim()) setAdminPhone(draftPhone.trim());
+      if (isTamil) {
+        setAdminAddressTamil(draftAddress.trim());
+      } else {
+        setAdminAddressEnglish(draftAddress.trim());
+      }
+      setUploadedImageUri(draftImageUri);
+
+      // Refresh cached user in AuthContext
+      await authService.getCurrentUser().catch(() => {});
+
+      setIsEditModalVisible(false);
+      Alert.alert(
+        t('common.success', 'வெற்றி'),
+        t('profile.editSuccess', 'சுயவிவரத் தகவல்கள் வெற்றிகரமாக புதுப்பிக்கப்பட்டன.')
+      );
+    } catch (err: any) {
+      console.error('❌ [ProfileScreen] Failed to save profile:', err);
+      Alert.alert(
+        t('common.error', 'பிழை'),
+        err?.response?.data?.message || err?.message || 'சுயவிவரத்தை புதுப்பிக்க முடியவில்லை.'
+      );
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
   // Direct image upload from main profile screen
@@ -569,13 +644,18 @@ export const ProfileScreen: React.FC = () => {
 
               <Pressable
                 onPress={handleSaveProfile}
-                style={styles.dialogSaveButton}
+                disabled={isSavingProfile}
+                style={[styles.dialogSaveButton, isSavingProfile && { opacity: 0.7 }]}
                 accessibilityRole="button"
                 accessibilityLabel={t('profile.editModalSave', 'மாற்றங்களைச் சேமிக்க')}
               >
-                <Text style={styles.dialogSaveText}>
-                  {t('profile.editModalSave', 'மாற்றங்களைச் சேமிக்க')}
-                </Text>
+                {isSavingProfile ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.dialogSaveText}>
+                    {t('profile.editModalSave', 'மாற்றங்களைச் சேமிக்க')}
+                  </Text>
+                )}
               </Pressable>
             </View>
           </View>

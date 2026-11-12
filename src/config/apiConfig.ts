@@ -10,7 +10,7 @@ export type Environment = 'development' | 'test' | 'preprod' | 'production';
 
 export const ENVIRONMENTS: Record<Environment, { BASE_URL: string }> = {
   development: {
-    BASE_URL: 'http://10.18.29.141:5000',
+    BASE_URL: 'https://c3f2-2401-4900-93fd-f07-35f5-be90-f956-bdcb.ngrok-free.app',
   },
   test: {
     BASE_URL: 'https://test-api.mandhragirijothidam.com',
@@ -52,6 +52,10 @@ export const API_CONFIG = {
       LOGOUT: '/auth/logout',
       VERIFY_TOKEN: '/auth/verify-token',
     },
+    PROFILE: {
+      ADMIN: '/profile/admin',
+      ADMIN_IMAGE: '/admin/profile/image',
+    },
     STAFF: {
       LIST: '/staff',
       CREATE: '/createStaff',
@@ -63,6 +67,16 @@ export const API_CONFIG = {
       DAILY: '/attendance/daily',
       RECORD: '/attendance/record',
       MONTHLY: (staffId: string | number) => `/attendance/${staffId}/monthly`,
+      SELF: '/attendance/self',
+    },
+    LEAVES: {
+      MY_LEAVES: '/staff/me/leaves',
+      APPLY: '/staff/me/leaves',
+      ALL: '/leaves/admin/all',
+      DECIDE: (id: string | number) => `/leaves/admin/${id}/decision`,
+    },
+    EVENTS: {
+      COMPLETE: (id: string | number) => `/events/${id}/complete`,
     },
     BOOKINGS: {
       LIST: '/bookings',

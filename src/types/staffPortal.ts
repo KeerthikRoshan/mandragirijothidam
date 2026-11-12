@@ -14,6 +14,7 @@ export type UserRole = 'admin' | 'staff';
 export interface StaffUserProfile {
   id: string; // e.g. "1" or "p-murugan"
   staffId?: string; // e.g. "MJSTF00001"
+  userId?: string;
   role: 'staff';
   staffRole?: string; // e.g. "Priest" or "Assistant"
   nameEnglish: string;
@@ -53,6 +54,7 @@ export type AuthUserProfile = StaffUserProfile | AdminUserProfile;
 
 export interface StaffAssignedEvent {
   id: string;
+  bookingNumber?: string;
   staffId: string;
   date: string; // YYYY-MM-DD
   timeSlot: string;

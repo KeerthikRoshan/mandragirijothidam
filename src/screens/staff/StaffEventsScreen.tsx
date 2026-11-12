@@ -110,7 +110,7 @@ export const StaffEventsScreen: React.FC = () => {
     (event: StaffAssignedEvent): ScheduleBooking => {
       return {
         id: event.id,
-        bookingNumber: `#BK-${event.id.replace('ev-', '').replace('today-', '')}`,
+        bookingNumber: event.bookingNumber || `#BK-${event.id.replace('ev-', '').replace('today-', '')}`,
         date: event.date,
         timeSlot: event.timeSlot,
         startTime: event.startTime,

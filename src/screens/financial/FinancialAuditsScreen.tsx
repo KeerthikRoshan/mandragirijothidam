@@ -58,6 +58,7 @@ import {
 } from '../../types/schedule';
 import { FinancialAuditsScreenNavigationProp } from '../../types/navigation';
 import { bookingApiService } from '../../services/bookingApiService';
+import { SkeletonBookingCard, SkeletonStatCard } from '../../components/common/SkeletonLoader';
 
 type FinancialTab = 'overview' | 'receivables' | 'settlements' | 'transactions';
 
@@ -186,7 +187,7 @@ export const FinancialAuditsScreen: React.FC = () => {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor="#FAF9F6" />
 
-      {/* Screen Header */}
+      {/* Screen Header matching SettingsHeader */}
       <View style={styles.header}>
         <Pressable
           onPress={() => navigation.goBack()}
@@ -212,81 +213,87 @@ export const FinancialAuditsScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Tabs Bar */}
-      <View style={styles.tabBar}>
-        <Pressable
-          onPress={() => setActiveTab('overview')}
-          style={[styles.tabItem, activeTab === 'overview' && styles.tabItemActive]}
+      {/* Tabs Bar with smooth horizontal scroll */}
+      <View style={styles.tabBarWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabScrollContent}
         >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'overview' && styles.tabTextActive,
-              isTa && styles.tabTamilFont,
-            ]}
+          <Pressable
+            onPress={() => setActiveTab('overview')}
+            style={[styles.tabItem, activeTab === 'overview' && styles.tabItemActive]}
           >
-            {t('financialAudits.tabOverview')}
-          </Text>
-        </Pressable>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === 'overview' && styles.tabTextActive,
+                isTa && styles.tabTamilFont,
+              ]}
+            >
+              {t('financialAudits.tabOverview')}
+            </Text>
+          </Pressable>
 
-        <Pressable
-          onPress={() => setActiveTab('receivables')}
-          style={[styles.tabItem, activeTab === 'receivables' && styles.tabItemActive]}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'receivables' && styles.tabTextActive,
-              isTa && styles.tabTamilFont,
-            ]}
+          <Pressable
+            onPress={() => setActiveTab('receivables')}
+            style={[styles.tabItem, activeTab === 'receivables' && styles.tabItemActive]}
           >
-            {t('financialAudits.tabReceivables')}
-          </Text>
-          {summary.pendingPaidCount + summary.partialPaidCount > 0 && (
-            <View style={styles.countBadge}>
-              <Text style={styles.countBadgeText}>
-                {summary.pendingPaidCount + summary.partialPaidCount}
-              </Text>
-            </View>
-          )}
-        </Pressable>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === 'receivables' && styles.tabTextActive,
+                isTa && styles.tabTamilFont,
+              ]}
+            >
+              {t('financialAudits.tabReceivables')}
+            </Text>
+            {summary.pendingPaidCount + summary.partialPaidCount > 0 && (
+              <View style={styles.countBadge}>
+                <Text style={styles.countBadgeText}>
+                  {summary.pendingPaidCount + summary.partialPaidCount}
+                </Text>
+              </View>
+            )}
+          </Pressable>
 
-        <Pressable
-          onPress={() => setActiveTab('settlements')}
-          style={[styles.tabItem, activeTab === 'settlements' && styles.tabItemActive]}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'settlements' && styles.tabTextActive,
-              isTa && styles.tabTamilFont,
-            ]}
+          <Pressable
+            onPress={() => setActiveTab('settlements')}
+            style={[styles.tabItem, activeTab === 'settlements' && styles.tabItemActive]}
           >
-            {t('financialAudits.tabSettlements')}
-          </Text>
-          {summary.priestPendingCount > 0 && (
-            <View style={[styles.countBadge, { backgroundColor: '#FDE8E8' }]}>
-              <Text style={[styles.countBadgeText, { color: '#B91C1C' }]}>
-                {summary.priestPendingCount}
-              </Text>
-            </View>
-          )}
-        </Pressable>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === 'settlements' && styles.tabTextActive,
+                isTa && styles.tabTamilFont,
+              ]}
+            >
+              {t('financialAudits.tabSettlements')}
+            </Text>
+            {summary.priestPendingCount > 0 && (
+              <View style={[styles.countBadge, { backgroundColor: '#FDE8E8' }]}>
+                <Text style={[styles.countBadgeText, { color: '#B91C1C' }]}>
+                  {summary.priestPendingCount}
+                </Text>
+              </View>
+            )}
+          </Pressable>
 
-        <Pressable
-          onPress={() => setActiveTab('transactions')}
-          style={[styles.tabItem, activeTab === 'transactions' && styles.tabItemActive]}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'transactions' && styles.tabTextActive,
-              isTa && styles.tabTamilFont,
-            ]}
+          <Pressable
+            onPress={() => setActiveTab('transactions')}
+            style={[styles.tabItem, activeTab === 'transactions' && styles.tabItemActive]}
           >
-            {t('financialAudits.tabTransactions')}
-          </Text>
-        </Pressable>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === 'transactions' && styles.tabTextActive,
+                isTa && styles.tabTamilFont,
+              ]}
+            >
+              {t('financialAudits.tabTransactions')}
+            </Text>
+          </Pressable>
+        </ScrollView>
       </View>
 
       {/* Content Area */}
@@ -786,39 +793,50 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAF9F6',
   },
   header: {
+    backgroundColor: '#FAF9F6',
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E7EB',
-    backgroundColor: '#FAF9F6',
+    paddingTop: 8,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EBEAE5',
   },
   backButton: {
     width: 38,
     height: 38,
     borderRadius: 10,
-    backgroundColor: '#EAE8DE',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#E8E8E4',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   headerTitleWrap: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#074735',
+    color: '#073E2E',
     letterSpacing: -0.3,
   },
   titleTamil: {
     fontSize: 17,
-    lineHeight: 23,
+    lineHeight: 22,
   },
   subtitle: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#68756F',
     marginTop: 2,
   },
   subtitleTamil: {
@@ -826,36 +844,41 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
   headerBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 10,
     backgroundColor: '#E2ECE7',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#D2E3DB',
   },
-  tabBar: {
-    flexDirection: 'row',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  tabBarWrapper: {
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
+  tabScrollContent: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    gap: 6,
+  },
   tabItem: {
-    flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
     flexDirection: 'row',
-    gap: 4,
+    gap: 6,
   },
   tabItemActive: {
     borderBottomColor: '#074735',
   },
   tabText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: '#6B7280',
     textAlign: 'center',
@@ -865,7 +888,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   tabTamilFont: {
-    fontSize: 11,
+    fontSize: 11.5,
+    lineHeight: 16,
   },
   countBadge: {
     paddingHorizontal: 5,
@@ -945,7 +969,8 @@ const styles = StyleSheet.create({
     color: '#074735',
   },
   tamilSmall: {
-    fontSize: 13,
+    fontSize: 12.5,
+    lineHeight: 18,
   },
   metricGrid: {
     flexDirection: 'row',
@@ -967,20 +992,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     fontWeight: '500',
+    lineHeight: 16,
   },
   tamilLabel: {
-    fontSize: 11,
+    fontSize: 10.5,
+    lineHeight: 15,
   },
   metricValue: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
     color: '#111827',
     marginTop: 4,
+    lineHeight: 22,
   },
   metricSub: {
     fontSize: 11,
     color: '#9CA3AF',
     marginTop: 2,
+    lineHeight: 15,
   },
   searchContainer: {
     flexDirection: 'row',

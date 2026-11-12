@@ -56,7 +56,6 @@ import {
 } from '../../services/scheduleAvailabilityService';
 import {
   INITIAL_SCHEDULE_BLOCKS,
-  INITIAL_SCHEDULE_BOOKINGS,
 } from '../../data/scheduleMockData';
 import { formatTamilDisplayDate, formatDateKey } from '../../utils/dateUtils';
 import { bookingApiService } from '../../services/bookingApiService';
@@ -76,7 +75,7 @@ export const DailyScheduleScreen: React.FC = () => {
   const [calendarMode, setCalendarMode] = useState<CalendarMode>('week');
   const [viewMode, setViewMode] = useState<ScheduleViewMode>('time');
   const [selectedCategory, setSelectedCategory] = useState<BookingCategory>('all');
-  const [bookings, setBookings] = useState<ScheduleBooking[]>(INITIAL_SCHEDULE_BOOKINGS);
+  const [bookings, setBookings] = useState<ScheduleBooking[]>([]);
   const [blocks] = useState(INITIAL_SCHEDULE_BLOCKS);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
@@ -92,9 +91,12 @@ export const DailyScheduleScreen: React.FC = () => {
       const data = await bookingApiService.listBookings();
       if (data && data.length > 0) {
         setBookings(data);
+      } else {
+        setBookings([]);
       }
     } catch (err) {
       console.warn('⚠️ [DailyScheduleScreen] Failed to load bookings from API:', err);
+      setBookings([]);
     }
   }, []);
 

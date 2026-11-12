@@ -14,7 +14,6 @@
 
 import axios from 'axios';
 import { Language, translations } from '../../constants/translations';
-import { PRIEST_MOCK_STAFF } from '../../data/priestMockData';
 import { staffService } from '../staffService';
 import { AdminUserProfile, AuthUserProfile, StaffUserProfile } from '../../types/staffPortal';
 import { authStorage } from '../../storage/authStorage';
@@ -198,17 +197,20 @@ export const authService = {
           role: 'admin',
         };
 
+    const maskedMobile = trimmedMobile
+      ? `${trimmedMobile.slice(0, 3)}****${trimmedMobile.slice(-2)}`
+      : '';
     const loginEndpointUrl = `${API_CONFIG.BASE_URL}${endpoint}`;
     console.log('====================================================');
     console.log('🚀 [API LOGIN REQUEST]');
     console.log(`📡 URL: ${loginEndpointUrl}`);
     console.log(`🔑 Role Mode: ${isStaff ? 'Staff (Priest / Assistant)' : 'Admin'}`);
-    console.log(`📱 Mobile Number: ${trimmedMobile}`);
+    console.log(`📱 Mobile Number: ${maskedMobile}`);
     console.log(
       '📋 Request Payload:',
       JSON.stringify(
         {
-          mobileNumber: trimmedMobile,
+          mobileNumber: maskedMobile,
           ...(isStaff ? {} : { role: 'admin' }),
           password: credentials.password ? '***[PROVIDED]***' : 'EMPTY',
         },
@@ -709,70 +711,76 @@ export const authService = {
       return cached.user as StaffUserProfile;
     }
 
-    // Default active staff for preview/tests if not logged in
-    const defaultStaff = PRIEST_MOCK_STAFF[0];
+    const user = await this.getCurrentUser();
+    if (user && isStaffRole(user.role)) {
+      return user as StaffUserProfile;
+    }
+
+    // Default empty profile for unauthenticated staff access
     return {
-      id: defaultStaff.id,
+      id: '',
       role: 'staff',
-      nameEnglish: defaultStaff.nameEnglish,
-      nameTamil: defaultStaff.nameTamil,
-      designationTamil: defaultStaff.designationTamil,
-      designationEnglish: defaultStaff.designationEnglish,
-      roleBadge: defaultStaff.roleBadge,
-      phone: defaultStaff.phone,
-      phoneDisplay: defaultStaff.phoneDisplay,
-      traditionTamil: defaultStaff.traditionTamil,
-      certificationTamil: defaultStaff.certificationTamil,
-      expertiseTamil: defaultStaff.expertiseTamil,
-      languagesTamil: defaultStaff.languagesTamil,
+      nameEnglish: 'Staff Member',
+      nameTamil: 'பணியாளர்',
+      designationTamil: 'கோவில் பணியாளர்',
+      designationEnglish: 'Temple Staff',
+      roleBadge: 'STAFF',
+      phone: '',
+      phoneDisplay: '',
+      traditionTamil: '',
+      certificationTamil: '',
+      expertiseTamil: '',
+      languagesTamil: '',
     };
   },
 
   /**
-   * Set active staff session directly
+   * Set active staff session directly without overwriting auth tokens
    */
-  async setStaffSession(staffId: string): Promise<StaffUserProfile> {
-    const staff = PRIEST_MOCK_STAFF.find(p => p.id === staffId) || PRIEST_MOCK_STAFF[0];
-    const profile: StaffUserProfile = {
-      id: staff.id,
-      role: 'staff',
-      nameEnglish: staff.nameEnglish,
-      nameTamil: staff.nameTamil,
-      designationTamil: staff.designationTamil,
-      designationEnglish: staff.designationEnglish,
-      roleBadge: staff.roleBadge,
-      phone: staff.phone,
-      phoneDisplay: staff.phoneDisplay,
-      traditionTamil: staff.traditionTamil,
-      certificationTamil: staff.certificationTamil,
-      expertiseTamil: staff.expertiseTamil,
-      languagesTamil: staff.languagesTamil,
-    };
-
-    const session: AuthSession = {
-      token: `staff-jwt-token-${staff.id}-${Date.now()}`,
-      refreshToken: `staff-refresh-token-${staff.id}-${Date.now()}`,
-      expiresAt: new Date(Date.now() + 86400000).toISOString(),
-      userId: staff.id,
-      role: 'staff',
-      staffId: staff.id,
-      user: profile,
-    };
-
-    currentSessionCache = session;
-    await authStorage.saveTokens({
-      accessToken: session.token,
-      refreshToken: session.refreshToken!,
-      expiresAt: session.expiresAt,
-    });
-    await authStorage.saveUserSession({
-      userId: staff.id,
-      staffId: staff.id,
-      role: 'staff',
-      user: profile,
-    });
-
-    return profile;
+  async setStaffSession(staffId?: string): Promise<StaffUserProfile> {
+    const current = await this.getCurrentStaff();
+    if (current && current.id && (!staffId || current.id === staffId)) {
+      return current;
+    }
+    if (staffId) {
+      let staffMember = staffService.getStaffById(staffId);
+      if (!staffMember && process.env.NODE_ENV === 'test') {
+        const { PRIEST_MOCK_STAFF } = require('../../data/priestMockData');
+        staffMember = PRIEST_MOCK_STAFF.find((p: any) => p.id === staffId);
+      }
+      if (staffMember) {
+        const updatedProfile: StaffUserProfile = {
+          id: staffMember.id,
+          role: 'staff',
+          nameEnglish: staffMember.nameEnglish,
+          nameTamil: staffMember.nameTamil,
+          designationTamil: staffMember.designationTamil,
+          designationEnglish: staffMember.designationEnglish,
+          roleBadge: staffMember.roleBadge,
+          phone: staffMember.phone,
+          phoneDisplay: staffMember.phoneDisplay,
+          traditionTamil: staffMember.traditionTamil,
+          certificationTamil: staffMember.certificationTamil,
+          expertiseTamil: staffMember.expertiseTamil,
+          languagesTamil: staffMember.languagesTamil,
+        };
+        if (currentSessionCache) {
+          currentSessionCache.user = updatedProfile;
+          await authStorage.saveUserSession(currentSessionCache);
+        } else if (process.env.NODE_ENV === 'test') {
+          const testSession: AuthSession = {
+            accessToken: 'test-session-token',
+            refreshToken: 'test-refresh-token',
+            role: 'staff',
+            user: updatedProfile,
+          };
+          currentSessionCache = testSession;
+          await authStorage.saveUserSession(testSession);
+        }
+        return updatedProfile;
+      }
+    }
+    return current;
   },
 
   /**

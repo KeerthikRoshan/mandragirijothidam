@@ -6,6 +6,15 @@ import { NavigationContainer } from '@react-navigation/native';
 import { ProfileScreen } from '../src/screens/profile/ProfileScreen';
 import { setAppLanguage } from '../src/i18n';
 import { authService } from '../src/services/auth/authService';
+import { apiClient } from '../src/services/apiClient';
+
+jest.mock('../src/services/apiClient', () => ({
+  apiClient: {
+    get: jest.fn(),
+    put: jest.fn(),
+    post: jest.fn(),
+  },
+}));
 
 const initialMetrics = {
   insets: { top: 44, left: 0, right: 0, bottom: 34 },
@@ -22,6 +31,26 @@ const extractText = (node: any): string => {
 
 describe('ProfileScreen Component (Simplified Admin & Chief Officiant Profile)', () => {
   beforeEach(async () => {
+    (apiClient.get as jest.Mock).mockResolvedValue({
+      data: {
+        success: true,
+        data: {
+          id: '2026-108',
+          phone: '9840123456',
+          nameEnglish: 'Sundaramoorthy Gurukkal',
+          nameTamil: 'சிவஸ்ரீ சுந்தரமூர்த்தி குருக்கள்',
+          email: 'mandhragiri.jothidam@gmail.com',
+          addressTamil: 'மதுரை - 625001',
+          addressEnglish: 'Madurai - 625001',
+        },
+      },
+    });
+    (apiClient.put as jest.Mock).mockResolvedValue({
+      data: {
+        success: true,
+        data: { id: 1 },
+      },
+    });
     await ReactTestRenderer.act(async () => {
       await setAppLanguage('ta');
     });

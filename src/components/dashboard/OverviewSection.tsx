@@ -23,7 +23,7 @@ interface OverviewSectionProps {
 
 export const OverviewSection: React.FC<OverviewSectionProps> = ({
   title = 'இன்றைய நிலை • Overview',
-  actionText = 'அறிக்கைகள் ›',
+  actionText,
   stats,
   onPressReports,
   onPressStat,
@@ -33,14 +33,16 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
       {/* Section Header Row */}
       <View style={styles.headerRow}>
         <Text style={styles.headingTitle}>{title}</Text>
-        <Pressable
-          onPress={onPressReports}
-          accessibilityRole="button"
-          accessibilityLabel={actionText}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text style={styles.actionText}>{actionText}</Text>
-        </Pressable>
+        {actionText ? (
+          <Pressable
+            onPress={onPressReports}
+            accessibilityRole="button"
+            accessibilityLabel={actionText}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.actionText}>{actionText}</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {/* 2x2 Statistics Grid */}

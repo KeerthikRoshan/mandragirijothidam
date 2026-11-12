@@ -11,7 +11,7 @@
  * 7. Bottom Navigation with active 'settings' (அமைப்புகள்) tab.
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Alert,
   Image,
@@ -24,7 +24,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import {
   Building2,
   CalendarCheck,
@@ -46,6 +46,10 @@ import { useTranslation } from 'react-i18next';
 import { setAppLanguage, SupportedLanguage } from '../../i18n';
 import { authService } from '../../services/auth/authService';
 import { PriestAssistantControlModal } from '../../components/settings/PriestAssistantControlModal';
+import { formatDateKey } from '../../utils/dateUtils';
+import { bookingApiService } from '../../services/bookingApiService';
+import { notificationApiService } from '../../services/notificationApiService';
+import { Skeleton } from '../../components/common/SkeletonLoader';
 
 export const SettingsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -57,6 +61,54 @@ export const SettingsScreen: React.FC = () => {
   const [isLanguageModalVisible, setIsLanguageModalVisible] = useState<boolean>(false);
   const [isPriestControlModalVisible, setIsPriestControlModalVisible] = useState<boolean>(false);
 
+
+  // Dynamic summary metrics state
+  const [todayPoojaCount, setTodayPoojaCount] = useState<number>(0);
+  const [totalBookingsCount, setTotalBookingsCount] = useState<number>(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number>(0);
+  const [loadingMetrics, setLoadingMetrics] = useState<boolean>(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+      const loadMetrics = async () => {
+        try {
+          const todayKey = formatDateKey(new Date());
+          const [todayList, allList, unread] = await Promise.allSettled([
+            bookingApiService.getBookingsByDate(todayKey),
+            bookingApiService.listBookings(),
+            notificationApiService.getUnreadCount(),
+          ]);
+
+          if (!isMounted) return;
+
+          if (todayList.status === 'fulfilled' && todayList.value) {
+            const count = todayList.value.filter(
+              b => b.date === todayKey && b.status !== 'cancelled' && b.status !== 'deleted'
+            ).length;
+            setTodayPoojaCount(count);
+          }
+          if (allList.status === 'fulfilled' && allList.value) {
+            const count = allList.value.filter(
+              b => b.status !== 'cancelled' && b.status !== 'deleted'
+            ).length;
+            setTotalBookingsCount(count);
+          }
+          if (unread.status === 'fulfilled') {
+            setUnreadNotificationsCount(unread.value || 0);
+          }
+        } catch (err) {
+          console.warn('⚠️ [SettingsScreen] Error loading summary metrics:', err);
+        } finally {
+          if (isMounted) setLoadingMetrics(false);
+        }
+      };
+      loadMetrics();
+      return () => {
+        isMounted = false;
+      };
+    }, [])
+  );
 
   const bottomNavHeight = 56 + Math.max(insets.bottom, 8);
 
@@ -71,13 +123,7 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const handleReports = () => {
-    Alert.alert(
-      t('settings.alerts.reportsTitle', 'அறிக்கைகள் & புள்ளிவிவரம்'),
-      t(
-        'settings.alerts.reportsMessage',
-        'நடப்பு மாத முன்பதிவுகள்: 142\nநிறைவடைந்த பூஜைகள்: 128\nவருமானம் & கட்டண வசூல் அறிக்கை தயார் நிலையில் உள்ளது.'
-      )
-    );
+    (navigation as any)?.navigate('FinancialAudits');
   };
 
   return (
@@ -155,21 +201,33 @@ export const SettingsScreen: React.FC = () => {
           {/* Metric 1: Today's Pooja */}
           <View style={styles.metricBox}>
             <Text style={styles.metricLabel}>{t('settings.metricPooja')}</Text>
-            <Text style={styles.metricValue}>8</Text>
+            {loadingMetrics ? (
+              <Skeleton width={32} height={20} borderRadius={4} style={styles.skeletonMetric} />
+            ) : (
+              <Text style={styles.metricValue}>{todayPoojaCount}</Text>
+            )}
             <Text style={styles.metricSubtextGreen}>{t('settings.metricPoojaSub')}</Text>
           </View>
 
-          {/* Metric 2: Horoscope Bookings */}
+          {/* Metric 2: All Active Bookings */}
           <View style={styles.metricBox}>
             <Text style={styles.metricLabel}>{t('settings.metricHoroscope')}</Text>
-            <Text style={styles.metricValue}>142</Text>
+            {loadingMetrics ? (
+              <Skeleton width={32} height={20} borderRadius={4} style={styles.skeletonMetric} />
+            ) : (
+              <Text style={styles.metricValue}>{totalBookingsCount}</Text>
+            )}
             <Text style={styles.metricSubtextGold}>{t('settings.metricHoroscopeSub')}</Text>
           </View>
 
-          {/* Metric 3: Reminders Sent */}
+          {/* Metric 3: Reminders / Notifications */}
           <View style={styles.metricBox}>
             <Text style={styles.metricLabel}>{t('settings.metricReminders')}</Text>
-            <Text style={styles.metricValueGold}>99%</Text>
+            {loadingMetrics ? (
+              <Skeleton width={32} height={20} borderRadius={4} style={styles.skeletonMetric} />
+            ) : (
+              <Text style={styles.metricValueGold}>{unreadNotificationsCount}</Text>
+            )}
             <Text style={styles.metricSubtextGray}>{t('settings.metricRemindersSub')}</Text>
           </View>
         </View>
@@ -373,15 +431,8 @@ export const SettingsScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* 8. Traditional Vedic Blessing Footer */}
+        {/* 8. Footer */}
         <View style={styles.footerContainer}>
-          <View style={styles.blessingRow}>
-            <Text style={styles.blessingIcon}>🕉</Text>
-            <Text style={styles.blessingText}>
-              {t('settings.blessingText')}
-            </Text>
-            <Text style={styles.blessingIcon}>🕉</Text>
-          </View>
           <Text style={styles.versionText}>
             {t('settings.versionText')}
           </Text>
@@ -615,6 +666,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#074735',
     marginVertical: 2,
+  },
+  skeletonMetric: {
+    marginVertical: 4,
   },
   metricValueGold: {
     fontSize: 22,

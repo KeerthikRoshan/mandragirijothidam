@@ -41,7 +41,6 @@ import { useTranslation } from 'react-i18next';
 import { ScheduleBooking } from '../../types/schedule';
 import { CompletedEventsScreenNavigationProp } from '../../types/navigation';
 import { bookingApiService } from '../../services/bookingApiService';
-import { INITIAL_SCHEDULE_BOOKINGS } from '../../data/scheduleMockData';
 import { getBookingDateTimes, isBookingEditable } from '../../utils/bookingRules';
 import { parseLocalDateParts } from '../../utils/timeCalculation';
 import { BookingCard } from '../../components/schedule/BookingCard';
@@ -71,11 +70,11 @@ export const CompletedEventsScreen: React.FC = () => {
         setAllBookings(list);
         return;
       }
+      setAllBookings([]);
     } catch (err) {
       console.warn('⚠️ [CompletedEventsScreen] Failed to fetch live bookings:', err);
+      setAllBookings([]);
     }
-    // Fallback to initial mock bookings
-    setAllBookings(INITIAL_SCHEDULE_BOOKINGS);
   }, []);
 
   useEffect(() => {

@@ -76,6 +76,7 @@ import {
 import type { LoginScreenNavigationProp } from '../../types/navigation';
 import { getAppLanguage, setAppLanguage } from '../../i18n';
 import { showToast } from '../../components/common/AppToast';
+import { useAuth } from '../../context/AuthContext';
 
 /** How far above the focused field we stop scrolling, so the field above it stays visible */
 const SCROLL_TOP_OFFSET = 100;
@@ -83,6 +84,7 @@ const SCROLL_TOP_OFFSET = 100;
 export const LoginScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<LoginScreenNavigationProp>();
+  const { login, loginStaff } = useAuth();
   const scrollViewRef = useRef<React.ElementRef<typeof ScrollView>>(null);
 
   // Input references for full-box tap focusing
@@ -252,29 +254,40 @@ export const LoginScreen: React.FC = () => {
     try {
       setLoading(true);
 
+      const maskedMobile = mobileNumber
+        ? `${mobileNumber.slice(0, 3)}****${mobileNumber.slice(-2)}`
+        : '';
       console.log('👉 [LoginScreen] Submitting login request:', {
-        mobileNumber,
+        mobile: maskedMobile,
         role: loginRole,
         language,
       });
 
-      const result = await authService.login(
-        {
-          mobileNumber,
-          password,
-          role: loginRole,
-        },
-        language,
-      );
+      const result =
+        loginRole === 'staff'
+          ? await loginStaff(
+              {
+                mobileNumber,
+                password,
+                role: loginRole,
+              },
+              language,
+            )
+          : await login(
+              {
+                mobileNumber,
+                password,
+                role: loginRole,
+              },
+              language,
+            );
 
       console.log('🏁 [LoginScreen] Login outcome status:', result.status);
 
       if (result.status === 'success') {
-        // 2. Based on selected role (admin or staff), navigate user to corresponding dashboard
+        // Based on selected role (admin or staff), navigate user to corresponding dashboard
         if (loginRole === 'staff' || isStaffRole(result.session.role)) {
-          navigation.replace('StaffDashboard', {
-            staffId: result.session.staffId || result.session.userId,
-          });
+          navigation.replace('StaffDashboard');
         } else {
           navigation.replace('Dashboard');
         }

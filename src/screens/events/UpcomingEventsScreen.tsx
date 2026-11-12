@@ -17,6 +17,7 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -39,11 +40,11 @@ import { useTranslation } from 'react-i18next';
 import { ScheduleBooking } from '../../types/schedule';
 import { UpcomingEventsScreenNavigationProp } from '../../types/navigation';
 import { bookingApiService } from '../../services/bookingApiService';
-import { INITIAL_SCHEDULE_BOOKINGS } from '../../data/scheduleMockData';
 import { buildBookingPayload, getBookingDateTimes, isBookingEditable } from '../../utils/bookingRules';
 import { parseLocalDateParts } from '../../utils/timeCalculation';
 import { TodayBookingCard } from '../../components/dashboard/TodayBookingCard';
 import { BookingDetailModal } from '../../components/dashboard/BookingDetailModal';
+import { SkeletonBookingCard } from '../../components/common/SkeletonLoader';
 import {
   PoojaBookingFormModal,
   NewBookingFormData,
@@ -76,11 +77,11 @@ export const UpcomingEventsScreen: React.FC = () => {
         setAllBookings(list);
         return;
       }
+      setAllBookings([]);
     } catch (err) {
       console.warn('⚠️ [UpcomingEventsScreen] Failed to fetch live bookings:', err);
+      setAllBookings([]);
     }
-    // Fallback to initial mock bookings
-    setAllBookings(INITIAL_SCHEDULE_BOOKINGS);
   }, []);
 
   useEffect(() => {
@@ -268,73 +269,81 @@ export const UpcomingEventsScreen: React.FC = () => {
         )}
       </View>
 
-      {/* Filter Pills */}
-      <View style={styles.filterBar}>
-        <Pressable
-          onPress={() => setActiveFilter('all')}
-          style={[styles.filterChip, activeFilter === 'all' && styles.filterChipActive]}
+      {/* Filter Pills with horizontal scroll */}
+      <View style={styles.filterScrollViewWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScrollContent}
         >
-          <Text
-            style={[
-              styles.filterChipText,
-              activeFilter === 'all' && styles.filterChipTextActive,
-              isTa && styles.chipTamilFont,
-            ]}
+          <Pressable
+            onPress={() => setActiveFilter('all')}
+            style={[styles.filterChip, activeFilter === 'all' && styles.filterChipActive]}
           >
-            {t('upcomingEvents.filterAll')}
-          </Text>
-        </Pressable>
+            <Text
+              style={[
+                styles.filterChipText,
+                activeFilter === 'all' && styles.filterChipTextActive,
+                isTa && styles.chipTamilFont,
+              ]}
+            >
+              {t('upcomingEvents.filterAll')}
+            </Text>
+          </Pressable>
 
-        <Pressable
-          onPress={() => setActiveFilter('next7')}
-          style={[styles.filterChip, activeFilter === 'next7' && styles.filterChipActive]}
-        >
-          <Text
-            style={[
-              styles.filterChipText,
-              activeFilter === 'next7' && styles.filterChipTextActive,
-              isTa && styles.chipTamilFont,
-            ]}
+          <Pressable
+            onPress={() => setActiveFilter('next7')}
+            style={[styles.filterChip, activeFilter === 'next7' && styles.filterChipActive]}
           >
-            {t('upcomingEvents.filterNext7Days')}
-          </Text>
-        </Pressable>
+            <Text
+              style={[
+                styles.filterChipText,
+                activeFilter === 'next7' && styles.filterChipTextActive,
+                isTa && styles.chipTamilFont,
+              ]}
+            >
+              {t('upcomingEvents.filterNext7Days')}
+            </Text>
+          </Pressable>
 
-        <Pressable
-          onPress={() => setActiveFilter('next30')}
-          style={[styles.filterChip, activeFilter === 'next30' && styles.filterChipActive]}
-        >
-          <Text
-            style={[
-              styles.filterChipText,
-              activeFilter === 'next30' && styles.filterChipTextActive,
-              isTa && styles.chipTamilFont,
-            ]}
+          <Pressable
+            onPress={() => setActiveFilter('next30')}
+            style={[styles.filterChip, activeFilter === 'next30' && styles.filterChipActive]}
           >
-            {t('upcomingEvents.filterNext30Days')}
-          </Text>
-        </Pressable>
+            <Text
+              style={[
+                styles.filterChipText,
+                activeFilter === 'next30' && styles.filterChipTextActive,
+                isTa && styles.chipTamilFont,
+              ]}
+            >
+              {t('upcomingEvents.filterNext30Days')}
+            </Text>
+          </Pressable>
 
-        <Pressable
-          onPress={() => setActiveFilter('month')}
-          style={[styles.filterChip, activeFilter === 'month' && styles.filterChipActive]}
-        >
-          <Text
-            style={[
-              styles.filterChipText,
-              activeFilter === 'month' && styles.filterChipTextActive,
-              isTa && styles.chipTamilFont,
-            ]}
+          <Pressable
+            onPress={() => setActiveFilter('month')}
+            style={[styles.filterChip, activeFilter === 'month' && styles.filterChipActive]}
           >
-            {t('upcomingEvents.filterThisMonth')}
-          </Text>
-        </Pressable>
+            <Text
+              style={[
+                styles.filterChipText,
+                activeFilter === 'month' && styles.filterChipTextActive,
+                isTa && styles.chipTamilFont,
+              ]}
+            >
+              {t('upcomingEvents.filterThisMonth')}
+            </Text>
+          </Pressable>
+        </ScrollView>
       </View>
 
       {/* Main List */}
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#074735" />
+        <View style={styles.skeletonListContainer}>
+          <SkeletonBookingCard />
+          <SkeletonBookingCard />
+          <SkeletonBookingCard />
         </View>
       ) : (
         <FlatList
@@ -406,39 +415,50 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAF9F6',
   },
   header: {
+    backgroundColor: '#FAF9F6',
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E7EB',
-    backgroundColor: '#FAF9F6',
+    paddingTop: 8,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EBEAE5',
   },
   backButton: {
     width: 38,
     height: 38,
     borderRadius: 10,
-    backgroundColor: '#EAE8DE',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#E8E8E4',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   headerTitleWrap: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#074735',
+    color: '#073E2E',
     letterSpacing: -0.3,
   },
   titleTamil: {
     fontSize: 17,
-    lineHeight: 23,
+    lineHeight: 22,
   },
   subtitle: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#68756F',
     marginTop: 2,
   },
   subtitleTamil: {
@@ -446,10 +466,14 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
   headerBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 10,
     backgroundColor: '#E2ECE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#D2E3DB',
   },
   headerBadgeText: {
     fontSize: 13,
@@ -483,15 +507,21 @@ const styles = StyleSheet.create({
   clearButton: {
     padding: 4,
   },
-  filterBar: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
+  filterScrollViewWrapper: {
     paddingVertical: 10,
+  },
+  filterScrollContent: {
+    paddingHorizontal: 16,
+    flexDirection: 'row',
     gap: 8,
   },
+  skeletonListContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
   filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: 16,
     backgroundColor: '#F3F4F6',
     borderWidth: 1,

@@ -26,7 +26,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import { useNotification } from '../../context/NotificationContext';
 import {
   ArrowRight,
   Bell,
@@ -66,7 +67,6 @@ import { StaffAttendanceRecord } from '../../types/attendance';
 import { StaffAssignedEvent, StaffReminder, StaffUserProfile } from '../../types/staffPortal';
 import { ScheduleBooking } from '../../types/schedule';
 import { BookingDetailModal } from '../../components/common/BookingDetailModal';
-import { PRIEST_MOCK_STAFF } from '../../data/priestMockData';
 import {
   formatDateKey,
   formatTamilDisplayDate,
@@ -82,6 +82,13 @@ export const StaffDashboardScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StaffDashboardScreenNavigationProp>();
   const route = useRoute<StaffDashboardScreenRouteProp>();
+  const { unreadCount, fetchUnreadCount } = useNotification();
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchUnreadCount().catch(() => {});
+    }, [fetchUnreadCount])
+  );
 
   // Authenticated Staff Profile State
   const [currentStaff, setCurrentStaff] = useState<StaffUserProfile | null>(null);
@@ -102,19 +109,17 @@ export const StaffDashboardScreen: React.FC = () => {
   });
   const [reminders, setReminders] = useState<StaffReminder[]>([]);
 
-  // Switch Staff Modal (for easy demonstration/testing across 5 staff members)
-  const [isStaffSwitchModalVisible, setIsStaffSwitchModalVisible] = useState<boolean>(false);
   const [selectedBooking, setSelectedBooking] = useState<ScheduleBooking | null>(null);
   const [isDetailModalVisible, setIsDetailModalVisible] = useState<boolean>(false);
 
   /**
-   * Load all staff dashboard data
+   * Load all staff dashboard data for currently authenticated staff
    */
-  const loadDashboardData = useCallback(async (staffIdParam?: string) => {
+  const loadDashboardData = useCallback(async () => {
     try {
       let staffProfile: StaffUserProfile;
-      if (staffIdParam) {
-        staffProfile = await authService.setStaffSession(staffIdParam);
+      if (route?.params?.staffId) {
+        staffProfile = await authService.setStaffSession(route.params.staffId);
       } else {
         staffProfile = await authService.getCurrentStaff();
       }
@@ -142,8 +147,8 @@ export const StaffDashboardScreen: React.FC = () => {
 
   useEffect(() => {
     setLoading(true);
-    loadDashboardData(route?.params?.staffId);
-  }, [route?.params?.staffId, loadDashboardData]);
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   // Handle Swipe Attendance Submission
   const handleSwipeAttendance = async (status: 'present' | 'absent') => {
@@ -185,7 +190,7 @@ export const StaffDashboardScreen: React.FC = () => {
                 'வெற்றி',
                 'நிகழ்வு வெற்றிகரமாக நிறைவு செய்யப்பட்டது என பதிவு செய்யப்பட்டது.'
               );
-              loadDashboardData(currentStaff.id);
+              loadDashboardData();
             } else {
               Alert.alert('பிழை', res.message || 'நிகழ்வை நிறைவு செய்ய முடியவில்லை.');
             }
@@ -199,15 +204,7 @@ export const StaffDashboardScreen: React.FC = () => {
   const handleCompleteReminder = async (rem: StaffReminder) => {
     if (!currentStaff) return;
     await completeReminder(rem.id, currentStaff.id);
-    loadDashboardData(currentStaff.id);
-  };
-
-  // Switch to another staff member
-  const handleSwitchStaff = async (staffId: string) => {
-    setIsStaffSwitchModalVisible(false);
-    setLoading(true);
-    await authService.setStaffSession(staffId);
-    loadDashboardData(staffId);
+    loadDashboardData();
   };
 
   const handleEventPress = (event: StaffAssignedEvent) => {
@@ -229,9 +226,9 @@ export const StaffDashboardScreen: React.FC = () => {
       status: event.status as any,
       statusLabelTamil: event.statusLabelTamil,
       notes: event.notesTamil,
-      priestNameTamil: currentStaff?.nameTamil,
-      priestNameEnglish: currentStaff?.nameEnglish,
-      priestPhone: currentStaff?.phone,
+      priestNameTamil: currentStaff?.nameTamil || '',
+      priestNameEnglish: currentStaff?.nameEnglish || '',
+      priestPhone: currentStaff?.phone || '',
     };
     setSelectedBooking(booking);
     setIsDetailModalVisible(true);
@@ -266,15 +263,26 @@ export const StaffDashboardScreen: React.FC = () => {
         </View>
 
         <View style={styles.headerRight}>
-          {/* Quick Staff Switch Button */}
+          {/* Notification Button */}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Switch staff profile"
-            onPress={() => setIsStaffSwitchModalVisible(true)}
-            style={styles.switchStaffButton}
+            accessibilityLabel={
+              unreadCount > 0
+                ? `அறிவிப்புகள், ${unreadCount} படிக்காதவை`
+                : 'அறிவிப்புகள்'
+            }
+            onPress={() => (navigation as any).navigate('Notification')}
+            style={styles.notificationHeaderButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Users size={16} color="#074735" />
-            <Text style={styles.switchStaffText}>மாற்றுக</Text>
+            <Bell size={18} color="#074735" />
+            {unreadCount > 0 && (
+              <View style={styles.badgeContainer}>
+                <Text style={styles.badgeText}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            )}
           </Pressable>
 
           {/* Refresh Button */}
@@ -283,7 +291,7 @@ export const StaffDashboardScreen: React.FC = () => {
             accessibilityLabel="Refresh portal"
             onPress={() => {
               setRefreshing(true);
-              loadDashboardData(currentStaff?.id);
+              loadDashboardData();
             }}
             style={styles.refreshButton}
           >
@@ -543,55 +551,6 @@ export const StaffDashboardScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* 8. Staff Switch Modal */}
-      <Modal
-        visible={isStaffSwitchModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsStaffSwitchModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalDialog}>
-            <Text style={styles.modalTitle}>பணியாளர் கணக்கு தேர்வு</Text>
-            <Text style={styles.modalSubtitle}>
-              Select staff account to view specific portal & attendance
-            </Text>
-
-            <View style={styles.staffListContainer}>
-              {PRIEST_MOCK_STAFF.map(staff => {
-                const isSelected = staff.id === currentStaff?.id;
-                return (
-                  <Pressable
-                    key={staff.id}
-                    onPress={() => handleSwitchStaff(staff.id)}
-                    style={[
-                      styles.staffSelectItem,
-                      isSelected && styles.staffSelectItemActive,
-                    ]}
-                  >
-                    <View style={styles.staffSelectDetails}>
-                      <Text style={styles.staffSelectNameEn}>{staff.nameEnglish}</Text>
-                      <Text style={styles.staffSelectNameTa}>{staff.nameTamil}</Text>
-                      <Text style={styles.staffSelectDes}>
-                        {staff.designationTamil} ({staff.designationEnglish})
-                      </Text>
-                    </View>
-                    {isSelected && <CheckCircle2 size={18} color="#145C43" />}
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <Pressable
-              onPress={() => setIsStaffSwitchModalVisible(false)}
-              style={styles.modalCloseButton}
-            >
-              <Text style={styles.modalCloseText}>மூடுக (Close)</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-
       {/* Shared Pooja Details Modal */}
       <BookingDetailModal
         visible={isDetailModalVisible}
@@ -687,6 +646,39 @@ const styles = StyleSheet.create({
     backgroundColor: '#F4EFEA',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  notificationHeaderButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 6,
+    backgroundColor: '#F4EFEA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  badgeContainer: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    zIndex: 10,
+    elevation: 4,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '700',
+    textAlign: 'center',
+    includeFontPadding: false,
+    lineHeight: 11,
   },
   scrollArea: {
     flex: 1,

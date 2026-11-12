@@ -22,7 +22,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardHeader } from '../../components/dashboard/DashboardHeader';
 import { DashboardWelcome } from '../../components/dashboard/DashboardWelcome';
 import { PanchangamCard } from '../../components/dashboard/PanchangamCard';
@@ -53,44 +54,17 @@ import {
 } from '../../utils/bookingRules';
 import { useTranslation } from 'react-i18next';
 
-function convertMockToScheduleBooking(
-  mock: EventBookingItem,
-  todayKey: string
-): ScheduleBooking {
-  const parts = (mock.timeRange || '09:00 AM – 10:00 AM').split('–');
-  const start = parts[0]?.trim() || '09:00 AM';
-  const end = parts[1]?.trim() || '10:00 AM';
-  return {
-    id: mock.id,
-    bookingNumber: `#BK-${mock.id.replace('event-', '')}`,
-    date: todayKey,
-    startTime: start,
-    endTime: end,
-    timeSlot: `${start} - ${end}`,
-    durationMinutes: 60,
-    titleTamil: mock.titleTamil,
-    titleEnglish: mock.titleEnglish || '',
-    clientName: mock.customerName,
-    clientPhone: '98401 23456',
-    locationTamil: mock.location || 'ஸ்ரீ மந்திரகிரி ஜோதிட பீடம்',
-    priestNameTamil: mock.adminOrPriestInfo || 'சுவாமி சுந்தரமூர்த்தி குருக்கள்',
-    category: mock.category === 'ஜாதகம்' ? 'jathagam' : 'outdoor',
-    categoryLabelTamil: mock.category,
-    status: 'confirmed',
-    statusLabelTamil: mock.status || 'உறுதியானது',
-    totalEventCharge: 5000,
-    clientAdvanceAmount: 1500,
-    clientTotalReceived: 1500,
-    clientBalanceAmount: 3500,
-    clientPaymentStatus: 'partial',
-    venueType: 'home',
-  };
-}
-
 export const DashboardScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<DashboardScreenNavigationProp>();
+  const { unreadCount, fetchUnreadCount } = useNotification();
   const { t, i18n } = useTranslation();
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchUnreadCount().catch(() => {});
+    }, [fetchUnreadCount])
+  );
   const scrollViewRef = useRef<ScrollView>(null);
   const [todaySectionY, setTodaySectionY] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<DashboardTabId>('home');
@@ -104,44 +78,61 @@ export const DashboardScreen: React.FC = () => {
     useState<ScheduleBooking | null>(null);
 
   const todayKey = useMemo(() => formatDateKey(new Date()), []);
-  const [todayBookings, setTodayBookings] = useState<ScheduleBooking[]>(() =>
-    sortTodayBookingsByStatusOrder(
-      DASHBOARD_MOCK_DATA.todayEvents.bookings.map(m =>
-        convertMockToScheduleBooking(m, todayKey)
-      )
-    )
-  );
-  const [todayCount, setTodayCount] = useState<number>(
-    DASHBOARD_MOCK_DATA.todayEvents.bookings.length
-  );
+  const [todayBookings, setTodayBookings] = useState<ScheduleBooking[]>([]);
+  const [todayCount, setTodayCount] = useState<number>(0);
+  const [overallUpcomingCount, setOverallUpcomingCount] = useState<number>(0);
+  const [financialTotalCollected, setFinancialTotalCollected] = useState<number | null>(null);
+  const [isLoadingDashboardStats, setIsLoadingDashboardStats] = useState<boolean>(true);
 
-  const loadTodayBookings = useCallback(async () => {
+  const loadDashboardData = useCallback(async () => {
+    setIsLoadingDashboardStats(true);
     try {
-      const list = await bookingApiService.getBookingsByDate(todayKey);
-      if (list && list.length > 0) {
-        // Strictly filter bookings scheduled for current local date only
-        const strictlyToday = list.filter(b => b.date === todayKey);
-        // Sort in strict order: LIVE -> UPCOMING -> COMPLETED
+      const [todayRes, upcomingRes, financialRes] = await Promise.allSettled([
+        bookingApiService.getBookingsByDate(todayKey),
+        bookingApiService.listBookings({ view: 'upcoming' }),
+        bookingApiService.getFinancialAuditSummary(),
+      ]);
+
+      if (todayRes.status === 'fulfilled' && todayRes.value) {
+        const strictlyToday = todayRes.value.filter(b => b.date === todayKey);
         const sorted = sortTodayBookingsByStatusOrder(strictlyToday);
         setTodayBookings(sorted);
         setTodayCount(sorted.length);
-        return;
+      } else {
+        setTodayBookings([]);
+        setTodayCount(0);
+      }
+
+      if (upcomingRes.status === 'fulfilled' && upcomingRes.value) {
+        // Exclude cancelled and deleted bookings
+        const validUpcoming = upcomingRes.value.filter(b => {
+          const s = (b.status || '').toLowerCase();
+          return s !== 'cancelled' && s !== 'deleted';
+        });
+        setOverallUpcomingCount(validUpcoming.length);
+      } else {
+        setOverallUpcomingCount(0);
+      }
+
+      if (financialRes.status === 'fulfilled' && financialRes.value?.summary) {
+        const collected = Number(financialRes.value.summary.totalCollected ?? 0);
+        setFinancialTotalCollected(collected);
+      } else {
+        setFinancialTotalCollected(0);
       }
     } catch (err) {
-      console.warn('⚠️ [DashboardScreen] Failed to load today bookings:', err);
+      console.warn('⚠️ [DashboardScreen] Failed to load dashboard data:', err);
+    } finally {
+      setIsLoadingDashboardStats(false);
     }
-    // Fallback to sample bookings for today if live database has none yet
-    const fallback = DASHBOARD_MOCK_DATA.todayEvents.bookings.map(m =>
-      convertMockToScheduleBooking(m, todayKey)
-    );
-    const sortedFallback = sortTodayBookingsByStatusOrder(fallback);
-    setTodayBookings(sortedFallback);
-    setTodayCount(sortedFallback.length);
   }, [todayKey]);
 
   useEffect(() => {
-    loadTodayBookings();
-  }, [loadTodayBookings]);
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  // Backward compatibility alias for single-function refresh
+  const loadTodayBookings = loadDashboardData;
 
   // Periodic refresh to keep LIVE / UPCOMING / COMPLETED classification accurate as time passes
   useEffect(() => {
@@ -199,47 +190,49 @@ export const DashboardScreen: React.FC = () => {
 
   const dynamicStats: OverviewStatItem[] = useMemo(() => {
     const isTa = (i18n.language || 'ta').startsWith('ta');
-    const { todayTotal, liveCount, upcomingCount, completedCount } = overviewCounts;
+    const { todayTotal, completedCount } = overviewCounts;
 
     return DASHBOARD_MOCK_DATA.overview.stats.map(stat => {
       if (stat.id === '1' || stat.id === 'stat-today') {
         return {
           ...stat,
-          value: String(todayTotal).padStart(2, '0'),
+          value: isLoadingDashboardStats ? '--' : String(todayTotal).padStart(2, '0'),
         };
       }
       if (stat.id === '2' || stat.id === 'stat-upcoming') {
         return {
           ...stat,
-          value: String(upcomingCount).padStart(2, '0'),
-          subtitle: isTa ? 'இன்று வரவிருப்பவை' : "Today's Upcoming",
+          title: isTa ? 'வரவிருப்பவை' : 'Upcoming',
+          value: isLoadingDashboardStats ? '--' : String(overallUpcomingCount).padStart(2, '0'),
+          subtitle: isTa ? 'அனைத்து வரவிருப்பவை' : 'All Upcoming',
         };
       }
       if (stat.id === '3' || stat.id === 'stat-financial') {
+        const displayVal =
+          financialTotalCollected === null || isLoadingDashboardStats
+            ? '--'
+            : `₹ ${Number(financialTotalCollected).toLocaleString('en-IN')}`;
         return {
           ...stat,
-          title: liveCount > 0 ? (isTa ? 'நேரலை நிகழ்வுகள்' : 'Live Events') : stat.title,
-          value: liveCount > 0 ? String(liveCount).padStart(2, '0') : stat.value,
-          subtitle: liveCount > 0 ? (isTa ? 'நடைபெறுகிறது' : 'In Progress') : stat.subtitle,
-          valueColor: liveCount > 0 ? '#16A34A' : stat.valueColor,
+          title: isTa ? 'நிதி தணிக்கைகள்' : 'Financial Audits',
+          value: displayVal,
+          subtitle: isTa ? 'கட்டண வசூல்' : 'Total Collections',
+          valueColor: '#B08D43',
         };
       }
       if (stat.id === '4' || stat.id === 'stat-completed') {
         return {
           ...stat,
-          value: String(completedCount).padStart(2, '0'),
+          value: isLoadingDashboardStats ? '--' : String(completedCount).padStart(2, '0'),
           subtitle: isTa ? 'இன்று முடிவுற்றவை' : "Today's Completed",
         };
       }
       return stat;
     });
-  }, [overviewCounts, i18n.language]);
+  }, [overviewCounts, overallUpcomingCount, financialTotalCollected, isLoadingDashboardStats, i18n.language]);
 
   const handleNotificationsPress = () => {
-    Alert.alert(
-      t('dashboard.notificationsTitle'),
-      t('dashboard.notificationsMessage', { count: 3 })
-    );
+    navigation.navigate('Notification');
   };
 
   const handleViewFullPanchangam = () => {
@@ -247,10 +240,6 @@ export const DashboardScreen: React.FC = () => {
       t('dashboard.fullPanchangamTitle'),
       t('dashboard.fullPanchangamMessage')
     );
-  };
-
-  const handleReportsPress = () => {
-    (navigation as any)?.navigate('FinancialAudits');
   };
 
   const handleStatPress = (stat: OverviewStatItem) => {
@@ -268,15 +257,8 @@ export const DashboardScreen: React.FC = () => {
       (navigation as any)?.navigate('UpcomingEvents');
       return;
     }
-    // 3. Financial Audits or Live Events
+    // 3. Financial Audits: Navigate directly to FinancialAuditsScreen
     if (id === 'stat-financial' || id === 'stat-pending' || id === '3' || id === 'stat-live') {
-      if (overviewCounts.liveCount > 0) {
-        scrollViewRef.current?.scrollTo({
-          y: Math.max(0, todaySectionY - 12),
-          animated: true,
-        });
-        return;
-      }
       (navigation as any)?.navigate('FinancialAudits');
       return;
     }
@@ -292,12 +274,37 @@ export const DashboardScreen: React.FC = () => {
     navigation?.navigate('DailySchedule');
   };
 
+  const liveBooking = useMemo(() => {
+    return todayBookings.find(b => {
+      const cls = classifyTodayBooking(b);
+      return cls === 'LIVE';
+    });
+  }, [todayBookings]);
+
+  const liveOperationData = useMemo(() => {
+    if (!liveBooking) return undefined;
+    const isTa = (i18n.language || 'ta').startsWith('ta');
+    return {
+      statusBadge: isTa ? 'நேரலை நிகழ்வு' : 'Live Event',
+      title: isTa
+        ? liveBooking.titleTamil || liveBooking.titleEnglish || ''
+        : liveBooking.titleEnglish || liveBooking.titleTamil || '',
+      location: isTa
+        ? liveBooking.locationTamil || liveBooking.venueType || ''
+        : liveBooking.locationTamil || liveBooking.venueType || '',
+      timeRange: liveBooking.timeSlot || `${liveBooking.startTime} – ${liveBooking.endTime}`,
+      priestInfo: liveBooking.priestNameTamil || '',
+      assistantInfo: liveBooking.assistantNameTamil || '',
+    };
+  }, [liveBooking, i18n.language]);
+
   const handleLiveOperationPress = () => {
-    const live = DASHBOARD_MOCK_DATA.todayEvents.liveOperation;
-    Alert.alert(
-      t('dashboard.liveEventTitle'),
-      `${live.title}\n${t('common.location')}: ${live.location}`
-    );
+    if (liveOperationData) {
+      Alert.alert(
+        t('dashboard.liveEventTitle'),
+        `${liveOperationData.title}\n${t('common.location')}: ${liveOperationData.location}`
+      );
+    }
   };
 
   const handleBookingPress = (booking: ScheduleBooking) => {
@@ -376,7 +383,7 @@ export const DashboardScreen: React.FC = () => {
       {/* SECTION 1: Top App Header */}
       <DashboardHeader
         brandTitle={DASHBOARD_MOCK_DATA.header.brandTitle}
-        notificationCount={DASHBOARD_MOCK_DATA.header.notificationCount}
+        notificationCount={unreadCount}
         onPressNotifications={handleNotificationsPress}
       />
 
@@ -407,9 +414,7 @@ export const DashboardScreen: React.FC = () => {
         {/* SECTION 4: Today's Overview */}
         <OverviewSection
           title={t('dashboard.overviewTitle')}
-          actionText={t('dashboard.statsReports')}
           stats={dynamicStats}
-          onPressReports={handleReportsPress}
           onPressStat={handleStatPress}
         />
 
@@ -424,7 +429,7 @@ export const DashboardScreen: React.FC = () => {
             title={t('dashboard.todayEventsTitle')}
             count={todayCount}
             actionText={t('common.viewAll')}
-            liveOperation={DASHBOARD_MOCK_DATA.todayEvents.liveOperation}
+            liveOperation={liveOperationData}
             bookings={todayBookings}
             onPressViewAll={handleViewAllEvents}
             onPressLiveOperation={handleLiveOperationPress}

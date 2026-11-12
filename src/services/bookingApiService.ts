@@ -216,6 +216,7 @@ export const bookingApiService = {
     status?: string;
     category?: string;
     search?: string;
+    view?: string;
   }): Promise<ScheduleBooking[]> {
     try {
       const response = await apiClient.get(API_CONFIG.ENDPOINTS.BOOKINGS.LIST, { params });

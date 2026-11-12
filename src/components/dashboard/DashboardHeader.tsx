@@ -49,12 +49,22 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         <Pressable
           onPress={onPressNotifications}
           accessibilityRole="button"
-          accessibilityLabel="Notifications"
+          accessibilityLabel={
+            notificationCount > 0
+              ? `Notifications, ${notificationCount} unread`
+              : 'Notifications'
+          }
           style={styles.notificationButton}
-          // hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Bell size={20} color="#2D3748" />
-          {notificationCount > 0 && <View style={styles.badgeDot} />}
+          {notificationCount > 0 && (
+            <View style={styles.badgeContainer}>
+              <Text style={styles.badgeText}>
+                {notificationCount > 99 ? '99+' : notificationCount}
+              </Text>
+            </View>
+          )}
         </Pressable>
       </View>
     </View>
@@ -114,24 +124,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    // borderWidth: 1,
-    // borderColor: '#E5E7EB',
-    // shadowColor: '#000',
-    // shadowOffset: { width: 0, height: 1 },
-    // shadowOpacity: 0.05,
-    // shadowRadius: 2,
-    // elevation: 1.5,
-    // position: 'relative',
+    position: 'relative',
   },
-  badgeDot: {
+  badgeContainer: {
     position: 'absolute',
-    top: 7,
-    right: 8,
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: '#DC2626',
-    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
     borderColor: '#FFFFFF',
+    zIndex: 10,
+    elevation: 4,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '700',
+    textAlign: 'center',
+    includeFontPadding: false,
+    lineHeight: 11,
   },
 });

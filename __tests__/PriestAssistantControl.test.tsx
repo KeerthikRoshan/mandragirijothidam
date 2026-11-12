@@ -555,7 +555,7 @@ describe('Priest & Assistant Control & Add Priest Form', () => {
       });
     });
 
-    it('gracefully creates staff item in offline fallback when backend API is unreachable', async () => {
+    it('gracefully handles error when backend API is unreachable', async () => {
       // Mock network error without response
       jest.spyOn(apiClient, 'post').mockRejectedValueOnce(new Error('Network error'));
 
@@ -592,10 +592,7 @@ describe('Priest & Assistant Control & Add Priest Form', () => {
         await submitButton.props.onPress();
       });
 
-      expect(mockSubmit).toHaveBeenCalledTimes(1);
-      const submittedPriest: PriestStaffItem = mockSubmit.mock.calls[0][0];
-      expect(submittedPriest.nameEnglish).toBe('Offline Priest');
-      expect(submittedPriest.phone).toBe('9840112233');
+      expect(mockSubmit).not.toHaveBeenCalled();
 
       await ReactTestRenderer.act(async () => {
         renderer.unmount();
@@ -604,6 +601,66 @@ describe('Priest & Assistant Control & Add Priest Form', () => {
   });
 
   describe('PriestAssistantControlModal', () => {
+    beforeEach(() => {
+      staffService.clear();
+      staffService.addStaff({
+        id: 'p-3',
+        nameEnglish: 'Ramu Assistant',
+        nameTamil: 'ராமு உதவியாளர்',
+        role: 'Assistant',
+        roleBadge: 'Assistant',
+        designationTamil: 'உதவியாளர்',
+        designationEnglish: 'Assistant',
+        fullTitleTamil: 'ராமு',
+        traditionTamil: 'வேத சைவ ஆகமம்',
+        certificationTamil: 'உதவியாளர்',
+        phone: '9840133333',
+        phoneDisplay: '984013 XXXXX',
+        status: 'inactive',
+        bookings: [],
+        stats: { total: 4, thisWeek: 0, conflicts: 0 },
+        tabCounts: { past: 2, active: 1, upcoming: 1 },
+        scheduledPoojasCount: 1,
+      });
+      staffService.addStaff({
+        id: 'p-2',
+        nameEnglish: 'Shastriji Venkateswaran',
+        nameTamil: 'சாஸ்திரிஜி வெங்கடேஸ்வரன்',
+        role: 'Priest',
+        roleBadge: 'Priest',
+        designationTamil: 'குருக்கள்',
+        designationEnglish: 'Priest',
+        fullTitleTamil: 'சிவஸ்ரீ வெங்கடேஸ்வரன்',
+        traditionTamil: 'வேத சைவ ஆகமம்',
+        certificationTamil: 'கள குரு',
+        phone: '9840122222',
+        phoneDisplay: '984012 XXXXX',
+        status: 'active',
+        bookings: [],
+        stats: { total: 8, thisWeek: 1, conflicts: 0 },
+        tabCounts: { past: 4, active: 2, upcoming: 2 },
+        scheduledPoojasCount: 2,
+      });
+      staffService.addStaff({
+        id: 'p-1',
+        nameEnglish: 'Swami Murugan',
+        nameTamil: 'சுவாமி முருகன்',
+        role: 'Chief Priest',
+        roleBadge: 'Chief Priest',
+        designationTamil: 'தலைமை குருக்கள்',
+        designationEnglish: 'Chief Priest',
+        fullTitleTamil: 'சிவஸ்ரீ முருகன் குருக்கள்',
+        traditionTamil: 'வேத சைவ ஆகமம்',
+        certificationTamil: 'கள குரு',
+        phone: '9840111111',
+        phoneDisplay: '984011 XXXXX',
+        status: 'active',
+        bookings: [],
+        stats: { total: 10, thisWeek: 2, conflicts: 0 },
+        tabCounts: { past: 5, active: 3, upcoming: 2 },
+        scheduledPoojasCount: 3,
+      });
+    });
     it('renders all created priests and assistants with Active/Inactive controls', async () => {
       const mockClose = jest.fn();
 

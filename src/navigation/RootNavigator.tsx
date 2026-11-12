@@ -6,6 +6,7 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { navigationRef } from './navigationRef';
 import { RootStackParamList } from '../types/navigation';
 import { SplashScreen } from '../screens/splash/SplashScreen';
 import { LoginScreen } from '../screens/auth/LoginScreen';
@@ -26,12 +27,13 @@ import { AdminLeaveManagementScreen } from '../screens/admin/AdminLeaveManagemen
 import { UpcomingEventsScreen } from '../screens/events/UpcomingEventsScreen';
 import { CompletedEventsScreen } from '../screens/events/CompletedEventsScreen';
 import { FinancialAuditsScreen } from '../screens/financial/FinancialAuditsScreen';
+import { NotificationScreen } from '../screens/notifications/NotificationScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export const RootNavigator: React.FC = () => {
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         initialRouteName="Splash"
         screenOptions={{
@@ -91,6 +93,7 @@ export const RootNavigator: React.FC = () => {
         <Stack.Screen name="UpcomingEvents" component={UpcomingEventsScreen} />
         <Stack.Screen name="CompletedEvents" component={CompletedEventsScreen} />
         <Stack.Screen name="FinancialAudits" component={FinancialAuditsScreen} />
+        <Stack.Screen name="Notification" component={NotificationScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -33,12 +33,10 @@ import {
   Phone,
   ShieldCheck,
   User,
-  Users,
 } from 'lucide-react-native';
 import { authService } from '../../services/auth/authService';
 import { StaffBottomNav } from '../../components/staff/StaffBottomNav';
 import { StaffUserProfile } from '../../types/staffPortal';
-import { PRIEST_MOCK_STAFF } from '../../data/priestMockData';
 import {
   StaffMoreScreenNavigationProp,
   StaffMoreScreenRouteProp,
@@ -50,7 +48,6 @@ export const StaffMoreScreen: React.FC = () => {
   const route = useRoute<StaffMoreScreenRouteProp>();
 
   const [currentStaff, setCurrentStaff] = useState<StaffUserProfile | null>(null);
-  const [isStaffSwitchModalVisible, setIsStaffSwitchModalVisible] = useState<boolean>(false);
 
   const loadStaff = useCallback(async (staffIdParam?: string) => {
     try {
@@ -88,12 +85,6 @@ export const StaffMoreScreen: React.FC = () => {
         },
       ]
     );
-  };
-
-  const handleSwitchStaff = async (staffId: string) => {
-    setIsStaffSwitchModalVisible(false);
-    await authService.setStaffSession(staffId);
-    loadStaff(staffId);
   };
 
   return (
@@ -218,25 +209,6 @@ export const StaffMoreScreen: React.FC = () => {
             </View>
             <ChevronRight size={16} color="#98A2B3" />
           </Pressable>
-
-          <View style={styles.menuDivider} />
-
-          {/* Switch Staff Profile */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Switch staff account"
-            onPress={() => setIsStaffSwitchModalVisible(true)}
-            style={styles.menuRow}
-          >
-            <View style={[styles.menuIconBox, { backgroundColor: '#FDFBF7' }]}>
-              <Users size={18} color="#936319" />
-            </View>
-            <View style={styles.menuContent}>
-              <Text style={styles.menuTitle}>பணியாளர் கணக்கு மாற்று</Text>
-              <Text style={styles.menuSub}>Switch staff account for testing</Text>
-            </View>
-            <ChevronRight size={16} color="#98A2B3" />
-          </Pressable>
         </View>
 
         {/* 4. Sign Out Button */}
@@ -250,54 +222,6 @@ export const StaffMoreScreen: React.FC = () => {
           <Text style={styles.signOutText}>வெளியேறு (Sign Out)</Text>
         </Pressable>
       </ScrollView>
-
-      {/* Staff Switch Modal */}
-      <Modal
-        visible={isStaffSwitchModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsStaffSwitchModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalDialog}>
-            <Text style={styles.modalTitle}>பணியாளர் கணக்கு தேர்வு</Text>
-            <Text style={styles.modalSubtitle}>
-              Select staff account to view specific portal & attendance
-            </Text>
-
-            <View style={styles.staffListContainer}>
-              {PRIEST_MOCK_STAFF.map(staff => {
-                const isSelected = staff.id === currentStaff?.id;
-                return (
-                  <Pressable
-                    key={staff.id}
-                    onPress={() => handleSwitchStaff(staff.id)}
-                    style={[
-                      styles.staffSelectItem,
-                      isSelected && styles.staffSelectItemActive,
-                    ]}
-                  >
-                    <View style={styles.staffSelectDetails}>
-                      <Text style={styles.staffSelectNameEn}>{staff.nameEnglish}</Text>
-                      <Text style={styles.staffSelectNameTa}>{staff.nameTamil}</Text>
-                      <Text style={styles.staffSelectDes}>
-                        {staff.designationTamil} ({staff.designationEnglish})
-                      </Text>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <Pressable
-              onPress={() => setIsStaffSwitchModalVisible(false)}
-              style={styles.modalCloseButton}
-            >
-              <Text style={styles.modalCloseText}>மூடுக (Close)</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
 
       {/* Bottom Nav */}
       <StaffBottomNav activeTab="more" staffId={currentStaff?.id} />

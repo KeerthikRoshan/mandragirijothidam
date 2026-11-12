@@ -7,9 +7,16 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { DailyScheduleScreen } from '../src/screens/schedule/DailyScheduleScreen';
 import { formatDateKey, formatTamilDisplayDate } from '../src/utils/dateUtils';
 
+const mockBookings = [
+  { id: '1', date: '2026-11-21', status: 'confirmed', category: 'jathagam', titleTamil: 'ஜாதக கணிப்பு & பலன் பார்த்தல்', startTime: '09:00 AM', clientName: 'ராமு', phone: '9840123456' },
+  { id: '2', date: '2026-11-21', status: 'confirmed', category: 'temple', titleTamil: 'திருமண முகூர்த்த பூஜை & சங்கல்பம்', startTime: '10:00 AM', clientName: 'சோமு', phone: '9840123457' },
+  { id: '3', date: '2026-11-21', status: 'pending', category: 'outdoor', titleTamil: 'கிரகப்பிரவேச கணபதி ஹோமம்', startTime: '11:00 AM', clientName: 'மாரி', phone: '9840123458' },
+  { id: '4', date: '2026-11-21', status: 'completed', category: 'outdoor', titleTamil: 'ஆயுள் ஹோமம் & மிருத்யுஞ்சய ஜபம்', startTime: '12:00 PM', clientName: 'கண்ணன்', phone: '9840123459' },
+];
+
 jest.mock('../src/services/bookingApiService', () => ({
   bookingApiService: {
-    listBookings: jest.fn().mockResolvedValue([]),
+    listBookings: jest.fn().mockImplementation(() => Promise.resolve(mockBookings)),
     createBooking: jest.fn().mockResolvedValue({}),
     checkAvailability: jest.fn().mockResolvedValue({ available: true, conflicts: [] }),
   },
@@ -33,7 +40,7 @@ const extractText = (node: any): string => {
 describe('DailyScheduleScreen Component', () => {
   it('renders weekly view mode with specified date params without full-month text or steppers', async () => {
     let renderer: ReactTestRenderer.ReactTestRenderer;
-    await ReactTestRenderer.act(() => {
+    await ReactTestRenderer.act(async () => {
       renderer = ReactTestRenderer.create(
         <SafeAreaProvider initialMetrics={initialMetrics}>
           <NavigationContainer>
@@ -47,6 +54,10 @@ describe('DailyScheduleScreen Component', () => {
           </NavigationContainer>
         </SafeAreaProvider>
       );
+    });
+
+    await ReactTestRenderer.act(async () => {
+      await new Promise(r => setTimeout(r, 50));
     });
 
     const root = renderer!.root;
